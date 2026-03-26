@@ -62,11 +62,29 @@ function chooseAffirmation(stats) {
   return pickRandom(AFFIRMATION_BUCKETS.active_and_finished);
 }
 
+function getProgressLabel(entry) {
+  const currentPage = Number(entry.currentPage) || 0;
+  const totalPages = Number(entry.totalPages) || 0;
+
+  if (!totalPages || currentPage <= 0) {
+    return '🟡 Just started!';
+  }
+
+  const percent = Math.round((currentPage / totalPages) * 100);
+
+  if (percent >= 85) return `🔴 Almost done! (${percent}%)`;
+  if (percent >= 35) return `🟠 Getting there! (${percent}%)`;
+  return `🟡 Just started! (${percent}%)`;
+}
+
 function formatCurrentReads(entries) {
   if (!entries.length) return 'No public current reads right now.';
   return entries
     .slice(0, 3)
-    .map((entry, index) => `**${index + 1}.** ${entry.book?.title || 'Unknown Title'}`)
+    .map((entry, index) => {
+      const title = entry.book?.title || 'Unknown Title';
+      return `**${index + 1}.** ${title} | ${getProgressLabel(entry)}`;
+    })
     .join('\n');
 }
 
@@ -142,7 +160,9 @@ function buildReaderStatsEmbed(targetUser, statsData) {
   );
 
   const affirmation = chooseAffirmation(counts);
-  embed.setDescription(`*${affirmation}*\n\n- Deskie 🧸💗`);
+  embed.setFooter({
+    text: `${affirmation} ー Deskie 🧸💗`,
+  });
 
   return embed;
 }
