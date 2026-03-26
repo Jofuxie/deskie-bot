@@ -297,7 +297,7 @@ function startDailyQuoteScheduler(client) {
   ensureStateFile();
 
   dailyQuoteTask = cron.schedule(
-    '0 9 * * *',
+    '0 8 * * *',
     async () => {
       console.log('[Daily Quote] Running scheduled 8:00 AM post...');
       await sendDailyQuote(client, 'scheduled');
