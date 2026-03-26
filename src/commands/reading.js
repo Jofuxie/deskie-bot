@@ -15,23 +15,47 @@ const { sendLog } = require('../functions/discordLogger');
 
 function buildProgressBar(currentPage, totalPages, size = 10) {
   if (!totalPages || totalPages <= 0) {
-    return [
-      '🧸 Reading Progress ~',
-      '⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ --%',
-      `Page ${currentPage ?? 0} / Unknown`,
-    ].join('\n');
+    return '⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜';
   }
 
   const safeCurrent = Math.max(0, Math.min(currentPage ?? 0, totalPages));
-  const percent = Math.round((safeCurrent / totalPages) * 100);
   const filled = Math.round((safeCurrent / totalPages) * size);
   const empty = size - filled;
 
-  return [
-    '🧸 Reading Progress ~',
-    `${'🟫'.repeat(filled)}${'⬜'.repeat(empty)} ${percent}%`,
-    `Page ${safeCurrent} / ${totalPages}`,
-  ].join('\n');
+  return `${'🟫'.repeat(filled)}${'⬜'.repeat(empty)}`;
+}
+
+function getProgressStatus(entry) {
+  const currentPage = Number(entry.currentPage) || 0;
+  const totalPages = Number(entry.totalPages) || 0;
+
+  if (!totalPages || currentPage <= 0) {
+    return {
+      label: '🔺 Just started!',
+      percent: 0,
+    };
+  }
+
+  const percent = Math.round((currentPage / totalPages) * 100);
+
+  if (percent >= 85) {
+    return {
+      label: '🔹 Almost done!',
+      percent,
+    };
+  }
+
+  if (percent >= 35) {
+    return {
+      label: '🔸 Getting there!',
+      percent,
+    };
+  }
+
+  return {
+    label: '🔺 Just started!',
+    percent,
+  };
 }
 
 function buildStars(rating) {
@@ -42,11 +66,16 @@ function buildStars(rating) {
 function buildReadingEntryText(entry, index) {
   const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
   const title = entry.book?.title || 'Unknown Title';
-  const progressBar = buildProgressBar(entry.currentPage ?? 0, entry.totalPages);
+  const status = getProgressStatus(entry);
+  const currentPage = entry.currentPage ?? 0;
+  const totalPages = entry.totalPages ?? 'Unknown';
 
   return [
-    `**${index}. ${title}**\nby ${authors}`,
-    progressBar,
+    `**${index}. ${title}**`,
+    `by ${authors}`,
+    `${status.label} Reading Progress ~`,
+    `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
+    `*Page ${currentPage} / ${totalPages}*`,
   ].join('\n');
 }
 
@@ -74,32 +103,38 @@ function buildReadingViewEmbed(user, entries) {
 
 function buildStartedEmbed(entry) {
   const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
+  const status = getProgressStatus(entry);
+  const currentPage = entry.currentPage ?? 0;
+  const totalPages = entry.totalPages ?? 'Unknown';
 
   return new EmbedBuilder()
     .setTitle(`📖 Started Reading: ${entry.book?.title || 'Unknown Title'}`)
     .setColor(0xA78B6D)
-    .setDescription(`by ${authors}`)
-    .addFields({
-      name: 'Progress',
-      value: buildProgressBar(entry.currentPage ?? 0, entry.totalPages),
-      inline: false,
-    })
+    .setDescription([
+      `by ${authors}`,
+      `${status.label} Reading Progress ~`,
+      `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
+      `*Page ${currentPage} / ${totalPages}*`,
+    ].join('\n'))
     .setThumbnail(entry.book?.coverUrl || null)
     .setTimestamp();
 }
 
 function buildProgressUpdatedEmbed(entry) {
   const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
+  const status = getProgressStatus(entry);
+  const currentPage = entry.currentPage ?? 0;
+  const totalPages = entry.totalPages ?? 'Unknown';
 
   return new EmbedBuilder()
     .setTitle(`📘 Progress Updated: ${entry.book?.title || 'Unknown Title'}`)
     .setColor(0xA78B6D)
-    .setDescription(`by ${authors}`)
-    .addFields({
-      name: 'Progress',
-      value: buildProgressBar(entry.currentPage ?? 0, entry.totalPages),
-      inline: false,
-    })
+    .setDescription([
+      `by ${authors}`,
+      `${status.label} Reading Progress ~`,
+      `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
+      `*Page ${currentPage} / ${totalPages}*`,
+    ].join('\n'))
     .setThumbnail(entry.book?.coverUrl || null)
     .setTimestamp();
 }
@@ -249,6 +284,20 @@ module.exports = {
 
           return interaction.reply({
             content: `⚠️ I found multiple TBR matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (result.status === 'already_in_reading') {
+          return interaction.reply({
+            content: `⚠️ **${result.entry.book.title}** is already in your current reads.`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (result.status === 'already_finished') {
+          return interaction.reply({
+            content: `⚠️ **${result.entry.book.title}** is already in your finished books.`,
             flags: MessageFlags.Ephemeral,
           });
         }

@@ -15,6 +15,8 @@ function pickBookFields(book = {}) {
       ? book.authors
       : ['Unknown Author'],
     publishedYear: book.publishedYear || null,
+    publisher: book.publisher || null,
+    description: book.description || null,
     coverUrl: book.coverUrl || null,
     openLibraryLink: book.openLibraryLink || null,
     goodreadsLink: book.goodreadsLink || null,
@@ -22,9 +24,47 @@ function pickBookFields(book = {}) {
   };
 }
 
-async function addTbrEntry({ guildId, userId, username, visibility, book }) {
-  const collection = await getTbrCollection();
+function getStateLabel(state) {
+  if (state === 'reading') return 'current reads';
+  if (state === 'finished') return 'finished books';
+  return 'TBR';
+}
 
+async function findExistingExactEntry(guildId, userId, title, { excludeId = null } = {}) {
+  const collection = await getTbrCollection();
+  const entries = await collection.find({ guildId, userId }).toArray();
+  const normalizedTitle = normalizeText(title);
+
+  const exactMatches = entries.filter((entry) => {
+    if (excludeId && entry.id === excludeId) return false;
+    return normalizeText(entry.book?.title) === normalizedTitle;
+  });
+
+  if (!exactMatches.length) return null;
+
+  const priority = { reading: 0, tbr: 1, finished: 2 };
+  exactMatches.sort((a, b) => {
+    const aPriority = priority[a.state] ?? 99;
+    const bPriority = priority[b.state] ?? 99;
+    return aPriority - bPriority;
+  });
+
+  return exactMatches[0];
+}
+
+async function addTbrEntry({ guildId, userId, username, visibility, book }) {
+  const existing = await findExistingExactEntry(guildId, userId, book.title);
+
+  if (existing) {
+    return {
+      status: 'already_exists',
+      existingState: existing.state,
+      stateLabel: getStateLabel(existing.state),
+      entry: existing,
+    };
+  }
+
+  const collection = await getTbrCollection();
   const cleanedBook = pickBookFields(book);
 
   const entry = {
@@ -44,7 +84,11 @@ async function addTbrEntry({ guildId, userId, username, visibility, book }) {
   };
 
   await collection.insertOne(entry);
-  return entry;
+
+  return {
+    status: 'added',
+    entry,
+  };
 }
 
 async function getUserEntries(
@@ -183,12 +227,34 @@ async function startReadingEntry(guildId, userId, query) {
     };
   }
 
+  const target = matches[0];
+
+  const duplicate = await findExistingExactEntry(
+    guildId,
+    userId,
+    target.book?.title,
+    { excludeId: target.id }
+  );
+
+  if (duplicate?.state === 'reading') {
+    return {
+      status: 'already_in_reading',
+      entry: duplicate,
+    };
+  }
+
+  if (duplicate?.state === 'finished') {
+    return {
+      status: 'already_finished',
+      entry: duplicate,
+    };
+  }
+
   const readingCount = await countUserReadingEntries(guildId, userId);
   if (readingCount >= 3) {
     return { status: 'limit_reached' };
   }
 
-  const target = matches[0];
   const collection = await getTbrCollection();
   const startedAt = new Date().toISOString();
 
@@ -443,4 +509,5 @@ module.exports = {
   returnReadingEntryToTbr,
   getUserFinishedEntries,
   getReaderStatsData,
+  findExistingExactEntry,
 };

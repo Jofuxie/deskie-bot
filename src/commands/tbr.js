@@ -217,7 +217,7 @@ module.exports = {
           });
         }
 
-        const entry = await addTbrEntry({
+        const result = await addTbrEntry({
           guildId: interaction.guildId,
           userId: interaction.user.id,
           username: interaction.user.username,
@@ -225,6 +225,13 @@ module.exports = {
           book,
         });
 
+        if (result.status === 'already_exists') {
+          return interaction.editReply({
+            content: `⚠️ **${book.title}** is already in your ${result.stateLabel}.`,
+          });
+        }
+
+        const entry = result.entry;
         const embed = buildTbrEntryEmbed(
           entry,
           visibility === 'public'
@@ -242,8 +249,6 @@ module.exports = {
           components,
         });
       } catch (error) {
-        console.error('tbr add error:', error);
-
         await sendLog(interaction.client, {
           title: '❌ TBR Add Error',
           color: 0xED4245,

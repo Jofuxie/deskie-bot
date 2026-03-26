@@ -104,7 +104,7 @@ function formatTbrSection(entries, count) {
     .join('\n');
 
   return [
-    `**${count}** *books in the pile *`,
+    `**${count}** *books in the pile*`,
     preview,
   ].join('\n');
 }
@@ -113,13 +113,13 @@ function formatLatestFinished(entry, finishedCount) {
   if (!entry) return 'No finished books yet.';
 
   const title = entry.book?.title || 'Unknown Title';
+  const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
   const rating = entry.rating ? buildStars(entry.rating) : 'No rating yet';
 
   return [
-    `${finishedCount} book${finishedCount === 1 ? '' : 's'}`,
-    '',
-    `**${title}**`,
-    rating,
+    `**${finishedCount}** *books completed, hooray!*`,
+    `└ **${title}**, by ${authors}`,
+    `  ${rating}`,
   ].join('\n');
 }
 
