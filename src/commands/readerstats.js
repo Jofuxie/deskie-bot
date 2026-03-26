@@ -95,16 +95,16 @@ function formatTbrSection(entries, count) {
 
   const preview = entries
     .slice(0, 2)
-    .map((entry, index) => {
+    .map((entry, index, array) => {
       const title = entry.book?.title || 'Unknown Title';
       const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
-      return `**${index + 1}.** ${title}\nby ${authors}`;
+      const line = index === array.length - 1 ? '└' : '├';
+      return `${line} **${index + 1}.** ${title}, by ${authors}`;
     })
-    .join('\n\n');
+    .join('\n');
 
   return [
-    `${count} book${count === 1 ? '' : 's'}`,
-    '',
+    `* **${count}** books in the pile *`,
     preview,
   ].join('\n');
 }
