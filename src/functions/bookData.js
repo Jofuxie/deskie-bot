@@ -30,6 +30,24 @@ function buildGoodreadsSearchLink(title, authors = []) {
   return `https://www.goodreads.com/search?q=${encodeURIComponent(query)}`;
 }
 
+function getPageCountFromEditions(doc) {
+  if (!doc || !doc.editions || !Array.isArray(doc.editions.docs)) {
+    return null;
+  }
+
+  for (const edition of doc.editions.docs) {
+    if (Number.isFinite(edition.number_of_pages_median)) {
+      return edition.number_of_pages_median;
+    }
+
+    if (Number.isFinite(edition.number_of_pages)) {
+      return edition.number_of_pages;
+    }
+  }
+
+  return null;
+}
+
 function normalizeOpenLibraryDoc(doc) {
   const title = doc.title || 'Unknown Title';
   const authors = Array.isArray(doc.author_name) && doc.author_name.length
@@ -43,6 +61,9 @@ function normalizeOpenLibraryDoc(doc) {
   const coverId = doc.cover_i || null;
   const openLibraryLink = buildOpenLibraryWorkUrl(doc.key);
   const coverUrl = buildOpenLibraryCoverUrl({ coverId, isbn });
+  const totalPages = Number.isFinite(doc.number_of_pages_median)
+    ? doc.number_of_pages_median
+    : getPageCountFromEditions(doc);
 
   return {
     openLibraryKey: doc.key || null,
@@ -57,6 +78,7 @@ function normalizeOpenLibraryDoc(doc) {
       ? doc.language.join(', ')
       : 'Unknown',
     isbn,
+    totalPages,
     coverUrl,
     openLibraryLink,
     goodreadsLink: buildGoodreadsSearchLink(title, authors),
@@ -82,6 +104,26 @@ async function searchBooks(query, limit = 5) {
     params: {
       q: query,
       limit,
+      fields: [
+        'key',
+        'title',
+        'subtitle',
+        'author_name',
+        'first_publish_year',
+        'publisher',
+        'language',
+        'isbn',
+        'cover_i',
+        'edition_count',
+        'ratings_average',
+        'ratings_count',
+        'want_to_read_count',
+        'already_read_count',
+        'currently_reading_count',
+        'subject',
+        'number_of_pages_median',
+        'editions',
+      ].join(','),
     },
     timeout: 15000,
   });
