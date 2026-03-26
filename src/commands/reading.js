@@ -72,7 +72,7 @@ function buildReadingEntryText(entry, index) {
 
   return [
     `**${index}. ${title}**\nby ${authors}`,
-    `${status.label} Reading Progress ~`,
+    `${status.icon} Reading Progress ~`,
     `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
     `*Page ${currentPage} / ${totalPages}*`,
   ].join('\n');
@@ -111,7 +111,7 @@ function buildStartedEmbed(entry) {
     .setColor(0xA78B6D)
     .setDescription([
       `by ${authors}`,
-      `${status.label} Reading Progress ~`,
+      `${status.icon} Reading Progress ~`,
       `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
       `*Page ${currentPage} / ${totalPages}*`,
     ].join('\n'))
@@ -130,7 +130,7 @@ function buildProgressUpdatedEmbed(entry) {
     .setColor(0xA78B6D)
     .setDescription([
       `by ${authors}`,
-      `${status.label} Reading Progress ~`,
+      `${status.icon} Reading Progress ~`,
       `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
       `*Page ${currentPage} / ${totalPages}*`,
     ].join('\n'))
