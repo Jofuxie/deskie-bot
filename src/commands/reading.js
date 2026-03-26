@@ -1,4 +1,3 @@
-// src/commands/reading.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -10,6 +9,7 @@ const {
   getUserReadingEntries,
   updateReadingProgress,
   finishReadingEntry,
+  returnReadingEntryToTbr,
 } = require('../functions/tbrStore');
 const { sendLog } = require('../functions/discordLogger');
 
@@ -50,15 +50,14 @@ function buildReadingEntryText(entry, index) {
   ].join('\n');
 }
 
-function buildReadingViewEmbed(user, entries, isSelf) {
+function buildReadingViewEmbed(user, entries) {
   const embed = new EmbedBuilder()
     .setTitle(`📚 ${user.username}'s Current Reads`)
     .setColor(0xA78B6D)
     .setTimestamp();
 
   if (!entries.length) {
-    embed.setDescription('No active reads found for this user.'
-    );
+    embed.setDescription('No public active reads found for this user.');
     return embed;
   }
 
@@ -126,6 +125,17 @@ function buildFinishedEmbed(entry) {
         inline: true,
       }
     )
+    .setThumbnail(entry.book?.coverUrl || null)
+    .setTimestamp();
+}
+
+function buildReturnedToTbrEmbed(entry) {
+  const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
+
+  return new EmbedBuilder()
+    .setTitle(`📚 Returned to TBR: ${entry.book?.title || 'Unknown Title'}`)
+    .setColor(0x5865F2)
+    .setDescription(`by ${authors}`)
     .setThumbnail(entry.book?.coverUrl || null)
     .setTimestamp();
 }
@@ -198,6 +208,17 @@ module.exports = {
             )
         )
     )
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('remove')
+        .setDescription('Return one of your current reads back to your TBR.')
+        .addStringOption(option =>
+          option
+            .setName('query')
+            .setDescription('Book title from your current reads')
+            .setRequired(true)
+        )
+    )
     .setDMPermission(false),
 
   async execute(interaction) {
@@ -227,8 +248,7 @@ module.exports = {
             .join('\n');
 
           return interaction.reply({
-            content:
-              `⚠️ I found multiple TBR matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            content: `⚠️ I found multiple TBR matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -269,7 +289,7 @@ module.exports = {
         );
 
         return interaction.reply({
-          embeds: [buildReadingViewEmbed(targetUser, entries, isSelf)],
+          embeds: [buildReadingViewEmbed(targetUser, entries)],
         });
       } catch (error) {
         await sendLog(interaction.client, {
@@ -311,8 +331,7 @@ module.exports = {
             .join('\n');
 
           return interaction.reply({
-            content:
-              `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            content: `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -375,8 +394,7 @@ module.exports = {
             .join('\n');
 
           return interaction.reply({
-            content:
-              `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            content: `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -401,6 +419,53 @@ module.exports = {
 
         return interaction.reply({
           content: '❌ Something went wrong while finishing that book.',
+          flags: MessageFlags.Ephemeral,
+        }).catch(() => null);
+      }
+    }
+
+    if (subcommand === 'remove') {
+      const query = interaction.options.getString('query', true);
+
+      try {
+        const result = await returnReadingEntryToTbr(
+          interaction.guildId,
+          interaction.user.id,
+          query
+        );
+
+        if (result.status === 'not_found') {
+          return interaction.reply({
+            content: '❌ I could not find that book in your current reads.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (result.status === 'multiple_matches') {
+          const matchList = result.matches
+            .slice(0, 10)
+            .map((entry, index) => `**${index + 1}.** ${entry.book.title} by ${entry.book.authors?.join(', ') || 'Unknown Author'}`)
+            .join('\n');
+
+          return interaction.reply({
+            content: `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        return interaction.reply({
+          embeds: [buildReturnedToTbrEmbed(result.entry)],
+          flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
+        });
+      } catch (error) {
+        await sendLog(interaction.client, {
+          title: '❌ Reading Remove Error',
+          color: 0xED4245,
+          description: `\`\`\`${error?.stack || error}\`\`\``,
+        });
+
+        return interaction.reply({
+          content: '❌ Something went wrong while returning that book to your TBR.',
           flags: MessageFlags.Ephemeral,
         }).catch(() => null);
       }

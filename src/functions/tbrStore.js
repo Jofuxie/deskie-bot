@@ -1,4 +1,3 @@
-// src/functions/tbrStore.js
 const { getTbrCollection } = require('./mongo');
 
 function makeEntryId() {
@@ -272,7 +271,7 @@ async function updateReadingProgress(guildId, userId, query, page) {
     {
       $set: {
         currentPage: numericPage,
-        totalPages: totalPages,
+        totalPages,
       },
     },
     { returnDocument: 'after' }
@@ -328,7 +327,7 @@ async function finishReadingEntry(guildId, userId, query, rating) {
         finishedAt,
         rating: numericRating,
         currentPage: totalPages ?? target.currentPage ?? null,
-        totalPages: totalPages,
+        totalPages,
       },
     },
     { returnDocument: 'after' }
@@ -340,6 +339,55 @@ async function finishReadingEntry(guildId, userId, query, rating) {
 
   return {
     status: 'finished',
+    entry: result,
+  };
+}
+
+async function returnReadingEntryToTbr(guildId, userId, query) {
+  const matches = await findUserEntriesByTitle(guildId, userId, query, {
+    state: 'reading',
+    includePrivate: true,
+  });
+
+  if (!matches.length) {
+    return { status: 'not_found' };
+  }
+
+  if (matches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches,
+    };
+  }
+
+  const target = matches[0];
+  const collection = await getTbrCollection();
+
+  const result = await collection.findOneAndUpdate(
+    {
+      guildId,
+      userId,
+      id: target.id,
+      state: 'reading',
+    },
+    {
+      $set: {
+        state: 'tbr',
+        startedAt: null,
+        currentPage: null,
+        finishedAt: null,
+        rating: null,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return { status: 'not_found' };
+  }
+
+  return {
+    status: 'returned',
     entry: result,
   };
 }
@@ -364,5 +412,6 @@ module.exports = {
   getUserReadingEntries,
   updateReadingProgress,
   finishReadingEntry,
+  returnReadingEntryToTbr,
   getUserFinishedEntries,
 };
