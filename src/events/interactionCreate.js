@@ -1,5 +1,12 @@
 // src/events/interactionCreate.js
-const { Events, InteractionType, EmbedBuilder, Colors, MessageFlags } = require('discord.js');
+const {
+  Events,
+  InteractionType,
+  EmbedBuilder,
+  Colors,
+  MessageFlags,
+} = require('discord.js');
+const { sendLog } = require('../functions/discordLogger');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -17,16 +24,41 @@ module.exports = {
       } catch (error) {
         console.error(`Error executing ${interaction.commandName}:`, error);
 
+        await sendLog(interaction.client, {
+          title: '❌ Command Error',
+          color: 0xED4245,
+          description: `Error while running \`/${interaction.commandName}\``,
+          fields: [
+            {
+              name: 'User',
+              value: `${interaction.user.tag} (${interaction.user.id})`,
+              inline: false,
+            },
+            {
+              name: 'Guild',
+              value: interaction.guild
+                ? `${interaction.guild.name} (${interaction.guild.id})`
+                : 'DM / Unknown',
+              inline: false,
+            },
+            {
+              name: 'Error',
+              value: `\`\`\`${error?.stack || error}\`\`\``,
+              inline: false,
+            },
+          ],
+        });
+
         if (interaction.replied || interaction.deferred) {
           await interaction.followUp({
             content: 'There was an error executing that command.',
             flags: MessageFlags.Ephemeral,
-          });
+          }).catch(() => null);
         } else {
           await interaction.reply({
             content: 'There was an error executing that command.',
             flags: MessageFlags.Ephemeral,
-          });
+          }).catch(() => null);
         }
       }
     }
@@ -54,14 +86,38 @@ module.exports = {
           });
         } catch (err) {
           console.error('sayModal handling error:', err);
+
+          await sendLog(interaction.client, {
+            title: '❌ sayModal Error',
+            color: 0xED4245,
+            description: 'Error while handling sayModal submission.',
+            fields: [
+              {
+                name: 'User',
+                value: `${interaction.user.tag} (${interaction.user.id})`,
+                inline: false,
+              },
+              {
+                name: 'Custom ID',
+                value: interaction.customId,
+                inline: false,
+              },
+              {
+                name: 'Error',
+                value: `\`\`\`${err?.stack || err}\`\`\``,
+                inline: false,
+              },
+            ],
+          });
+
           await interaction.reply({
             content: '❌ Failed to send message.',
             flags: MessageFlags.Ephemeral,
-          });
+          }).catch(() => null);
         }
       }
 
-      // New announce modal
+      // Existing announce modal
       else if (interaction.customId.startsWith('announceModal|')) {
         try {
           const [, channelId, everyoneFlag, hereFlag, roleIdsRaw] =
@@ -109,10 +165,34 @@ module.exports = {
           });
         } catch (err) {
           console.error('announceModal handling error:', err);
+
+          await sendLog(interaction.client, {
+            title: '❌ announceModal Error',
+            color: 0xED4245,
+            description: 'Error while handling announceModal submission.',
+            fields: [
+              {
+                name: 'User',
+                value: `${interaction.user.tag} (${interaction.user.id})`,
+                inline: false,
+              },
+              {
+                name: 'Custom ID',
+                value: interaction.customId,
+                inline: false,
+              },
+              {
+                name: 'Error',
+                value: `\`\`\`${err?.stack || err}\`\`\``,
+                inline: false,
+              },
+            ],
+          });
+
           await interaction.reply({
             content: '❌ Failed to send announcement.',
             flags: MessageFlags.Ephemeral,
-          });
+          }).catch(() => null);
         }
       }
     }

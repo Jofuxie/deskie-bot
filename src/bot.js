@@ -1,12 +1,13 @@
-// src/index.js
+// src/bot.js
 require("dotenv").config();
 const { TOKEN } = process.env;
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+const { sendLog } = require('./functions/discordLogger');
 
 // Initialize client with necessary intents for guilds, messages, reactions, and members
-const client = new Client({ 
+const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
@@ -16,8 +17,33 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// Load commands dynamically into client.commands collection
 client.commands = new Collection();
+
+// Keep this only if you already rely on it elsewhere
+client.reactionRoles = new Map();
+
+// Global error logging to Discord log channel
+process.on('unhandledRejection', async (reason) => {
+    console.error('UNHANDLED REJECTION:', reason);
+
+    await sendLog(client, {
+        title: '⚠️ Unhandled Rejection',
+        description: `\`\`\`${reason?.stack || reason}\`\`\``,
+        color: 0xFAA61A,
+    });
+});
+
+process.on('uncaughtException', async (error) => {
+    console.error('UNCAUGHT EXCEPTION:', error);
+
+    await sendLog(client, {
+        title: '💥 Uncaught Exception',
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+        color: 0xED4245,
+    });
+});
+
+// Load commands dynamically into client.commands collection
 const commandsPath = path.join(__dirname, 'commands');
 
 for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'))) {
