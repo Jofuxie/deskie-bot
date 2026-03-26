@@ -1,101 +1,157 @@
-// src/functions/bookData.js
-const axios = require('axios');
+// src/functions/tbrStore.js
+const fs = require('fs');
+const path = require('path');
 
-function truncate(text, max = 500) {
-  if (!text) return 'No description available.';
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 3)}...`;
-}
+const dataDir = path.join(__dirname, '..', 'data');
+const tbrPath = path.join(dataDir, 'tbr.json');
 
-function buildOpenLibraryWorkUrl(workKey) {
-  if (!workKey) return null;
-  return `https://openlibrary.org${workKey}`;
-}
-
-function buildOpenLibraryCoverUrl({ coverId, isbn }) {
-  if (coverId) {
-    return `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`;
+function ensureStore() {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  if (isbn) {
-    return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+  if (!fs.existsSync(tbrPath)) {
+    fs.writeFileSync(
+      tbrPath,
+      JSON.stringify({ entries: [] }, null, 2),
+      'utf8'
+    );
+  }
+}
+
+function readStore() {
+  ensureStore();
+  const raw = fs.readFileSync(tbrPath, 'utf8');
+  return JSON.parse(raw);
+}
+
+function writeStore(data) {
+  ensureStore();
+  fs.writeFileSync(tbrPath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function makeEntryId() {
+  return `tbr_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function normalizeText(text = '') {
+  return String(text).trim().toLowerCase();
+}
+
+function addTbrEntry({ guildId, userId, username, visibility, book }) {
+  const data = readStore();
+
+  const entry = {
+    id: makeEntryId(),
+    guildId,
+    userId,
+    username,
+    visibility,
+    addedAt: new Date().toISOString(),
+    book,
+  };
+
+  data.entries.push(entry);
+  writeStore(data);
+  return entry;
+}
+
+function getUserEntries(guildId, userId, { includePrivate = false } = {}) {
+  const data = readStore();
+
+  return data.entries.filter((entry) => {
+    if (entry.guildId !== guildId) return false;
+    if (entry.userId !== userId) return false;
+    if (includePrivate) return true;
+    return entry.visibility === 'public';
+  });
+}
+
+function getPublicGuildEntries(guildId) {
+  const data = readStore();
+
+  return data.entries.filter(
+    (entry) => entry.guildId === guildId && entry.visibility === 'public'
+  );
+}
+
+function removeUserEntry(guildId, userId, entryId) {
+  const data = readStore();
+  const before = data.entries.length;
+
+  data.entries = data.entries.filter(
+    (entry) =>
+      !(
+        entry.guildId === guildId &&
+        entry.userId === userId &&
+        entry.id === entryId
+      )
+  );
+
+  writeStore(data);
+  return data.entries.length < before;
+}
+
+function findUserEntriesByTitle(guildId, userId, query) {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return [];
+
+  const entries = getUserEntries(guildId, userId, { includePrivate: true });
+
+  const exactMatches = entries.filter((entry) => {
+    const title = normalizeText(entry.book?.title);
+    return title === normalizedQuery;
+  });
+
+  if (exactMatches.length) return exactMatches;
+
+  return entries.filter((entry) => {
+    const title = normalizeText(entry.book?.title);
+    return title.includes(normalizedQuery);
+  });
+}
+
+function removeUserEntryByTitle(guildId, userId, query) {
+  const matches = findUserEntriesByTitle(guildId, userId, query);
+
+  if (!matches.length) {
+    return { status: 'not_found' };
   }
 
-  return null;
-}
+  if (matches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches,
+    };
+  }
 
-function buildGoodreadsSearchLink(title, authors = []) {
-  const authorText = authors.length ? ` ${authors[0]}` : '';
-  const query = `${title}${authorText}`.trim();
-  return `https://www.goodreads.com/search?q=${encodeURIComponent(query)}`;
-}
+  const target = matches[0];
+  const removed = removeUserEntry(guildId, userId, target.id);
 
-function normalizeOpenLibraryDoc(doc) {
-  const title = doc.title || 'Unknown Title';
-  const authors = Array.isArray(doc.author_name) && doc.author_name.length
-    ? doc.author_name
-    : ['Unknown Author'];
-
-  const isbn = Array.isArray(doc.isbn) && doc.isbn.length
-    ? doc.isbn[0]
-    : null;
-
-  const coverId = doc.cover_i || null;
-  const openLibraryLink = buildOpenLibraryWorkUrl(doc.key);
-  const coverUrl = buildOpenLibraryCoverUrl({ coverId, isbn });
+  if (!removed) {
+    return { status: 'not_found' };
+  }
 
   return {
-    openLibraryKey: doc.key || null,
-    title,
-    subtitle: doc.subtitle || null,
-    authors,
-    publishedYear: doc.first_publish_year ? String(doc.first_publish_year) : 'Unknown',
-    publisher: Array.isArray(doc.publisher) && doc.publisher.length
-      ? doc.publisher[0]
-      : 'Unknown',
-    language: Array.isArray(doc.language) && doc.language.length
-      ? doc.language.join(', ')
-      : 'Unknown',
-    isbn,
-    coverUrl,
-    openLibraryLink,
-    goodreadsLink: buildGoodreadsSearchLink(title, authors),
-    editionCount: doc.edition_count || 0,
-    ratingsAverage: typeof doc.ratings_average === 'number' ? doc.ratings_average : null,
-    ratingsCount: typeof doc.ratings_count === 'number' ? doc.ratings_count : null,
-    wantToReadCount: typeof doc.want_to_read_count === 'number' ? doc.want_to_read_count : null,
-    alreadyReadCount: typeof doc.already_read_count === 'number' ? doc.already_read_count : null,
-    currentlyReadingCount: typeof doc.currently_reading_count === 'number' ? doc.currently_reading_count : null,
-    subject: Array.isArray(doc.subject) && doc.subject.length
-      ? doc.subject.slice(0, 5)
-      : [],
-    description: truncate(
-      Array.isArray(doc.subject) && doc.subject.length
-        ? `Subjects: ${doc.subject.slice(0, 8).join(', ')}`
-        : 'No description available.'
-    ),
+    status: 'removed',
+    entry: target,
   };
 }
 
-async function searchBooks(query, limit = 5) {
-  const response = await axios.get('https://openlibrary.org/search.json', {
-    params: {
-      q: query,
-      limit,
-    },
-    timeout: 15000,
-  });
+function getRandomPublicEntry(guildId) {
+  const publicEntries = getPublicGuildEntries(guildId);
+  if (!publicEntries.length) return null;
 
-  const docs = response.data?.docs || [];
-  return docs.map(normalizeOpenLibraryDoc);
-}
-
-async function getBestBookMatch(query) {
-  const results = await searchBooks(query, 1);
-  return results[0] || null;
+  const randomIndex = Math.floor(Math.random() * publicEntries.length);
+  return publicEntries[randomIndex];
 }
 
 module.exports = {
-  searchBooks,
-  getBestBookMatch,
+  addTbrEntry,
+  getUserEntries,
+  getPublicGuildEntries,
+  removeUserEntry,
+  removeUserEntryByTitle,
+  findUserEntriesByTitle,
+  getRandomPublicEntry,
 };

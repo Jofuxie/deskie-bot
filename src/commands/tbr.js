@@ -12,8 +12,9 @@ const { getBestBookMatch } = require('../functions/bookData');
 const {
   addTbrEntry,
   getUserEntries,
-  removeUserEntry,
+  removeUserEntryByTitle,
 } = require('../functions/tbrStore');
+const { sendLog } = require('../functions/discordLogger');
 
 function buildTbrEntryEmbed(entry, titlePrefix = '📚 TBR Entry') {
   const book = entry.book;
@@ -50,14 +51,6 @@ function buildTbrEntryEmbed(entry, titlePrefix = '📚 TBR Entry') {
     });
   }
 
-  if (book.ratingsAverage !== null) {
-    embed.addFields({
-      name: 'Open Library Rating',
-      value: `${book.ratingsAverage}/5${book.ratingsCount ? ` (${book.ratingsCount} ratings)` : ''}`,
-      inline: true,
-    });
-  }
-
   return embed;
 }
 
@@ -87,34 +80,75 @@ function buildBookButtons(book) {
   return [new ActionRowBuilder().addComponents(buttons.slice(0, 5))];
 }
 
-function buildTbrListEmbed(user, entries, includePrivate) {
+function formatEntryLine(entry, index, { showVisibility = false } = {}) {
+  const authorText = entry.book.authors?.join(', ') || 'Unknown Author';
+  const published = entry.book.publishedYear ? ` (${entry.book.publishedYear})` : '';
+  const visibilityLine = showVisibility
+    ? `\nVisibility: \`${entry.visibility}\``
+    : '';
+
+  return `**${index}. ${entry.book.title}**${published}\nby ${authorText}${visibilityLine}`;
+}
+
+function buildOwnTbrEmbed(user, entries) {
   const embed = new EmbedBuilder()
     .setTitle(`📚 ${user.username}'s TBR`)
-    .setColor(includePrivate ? 0xFEE75C : 0x57F287)
+    .setColor(0xFEE75C)
     .setTimestamp();
 
-  if (!entries.length) {
-    embed.setDescription(
-      includePrivate
-        ? 'No books saved to your TBR yet.'
-        : 'No public TBR books found for this user.'
-    );
+  const publicEntries = entries.filter(entry => entry.visibility === 'public');
+  const privateEntries = entries.filter(entry => entry.visibility === 'private');
+
+  if (!publicEntries.length && !privateEntries.length) {
+    embed.setDescription('No books saved to your TBR yet.');
     return embed;
   }
 
-  const lines = entries.slice(0, 10).map((entry, index) => {
-    const authorText = entry.book.authors?.join(', ') || 'Unknown Author';
-    return `**${index + 1}. ${entry.book.title}**\n` +
-      `by ${authorText}\n` +
-      `Visibility: \`${entry.visibility}\`\n` +
-      `Entry ID: \`${entry.id}\``;
-  });
+  embed.setDescription('Here’s your full TBR, split by visibility.');
 
-  embed.setDescription(lines.join('\n\n'));
+  embed.addFields(
+    {
+      name: '🌍 Public',
+      value: publicEntries.length
+        ? publicEntries
+            .slice(0, 10)
+            .map((entry, index) => formatEntryLine(entry, index + 1))
+            .join('\n\n')
+        : 'No public books yet.',
+      inline: false,
+    },
+    {
+      name: '🔒 Private',
+      value: privateEntries.length
+        ? privateEntries
+            .slice(0, 10)
+            .map((entry, index) => formatEntryLine(entry, index + 1))
+            .join('\n\n')
+        : 'No private books yet.',
+      inline: false,
+    }
+  );
 
-  if (entries.length > 10) {
-    embed.setFooter({ text: `Showing 10 of ${entries.length} entries` });
+  return embed;
+}
+
+function buildOtherUserTbrEmbed(user, entries) {
+  const embed = new EmbedBuilder()
+    .setTitle(`📚 ${user.username}'s Public TBR`)
+    .setColor(0x57F287)
+    .setTimestamp();
+
+  if (!entries.length) {
+    embed.setDescription('No public TBR books found for this user.');
+    return embed;
   }
+
+  embed.setDescription(
+    entries
+      .slice(0, 15)
+      .map((entry, index) => formatEntryLine(entry, index + 1))
+      .join('\n\n')
+  );
 
   return embed;
 }
@@ -130,7 +164,7 @@ module.exports = {
         .addStringOption(option =>
           option
             .setName('query')
-            .setDescription('Book title, author, or ISBN')
+            .setDescription('Book title, author, or both')
             .setRequired(true)
         )
         .addStringOption(option =>
@@ -158,11 +192,11 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('remove')
-        .setDescription('Remove one of your TBR entries by Entry ID.')
+        .setDescription('Remove one of your TBR books by title.')
         .addStringOption(option =>
           option
-            .setName('entry_id')
-            .setDescription('The Entry ID shown in /tbr view')
+            .setName('query')
+            .setDescription('Type the title of the book you want to remove')
             .setRequired(true)
         )
     )
@@ -215,6 +249,41 @@ module.exports = {
       } catch (error) {
         console.error('tbr add error:', error);
 
+        await sendLog(interaction.client, {
+          title: '❌ TBR Add Error',
+          color: 0xED4245,
+          description: 'Error while adding a book to TBR.',
+          fields: [
+            {
+              name: 'User',
+              value: `${interaction.user.tag} (${interaction.user.id})`,
+              inline: false,
+            },
+            {
+              name: 'Query',
+              value: query,
+              inline: false,
+            },
+            {
+              name: 'Visibility',
+              value: visibility,
+              inline: true,
+            },
+            {
+              name: 'Guild',
+              value: interaction.guild
+                ? `${interaction.guild.name} (${interaction.guild.id})`
+                : 'DM / Unknown',
+              inline: false,
+            },
+            {
+              name: 'Error',
+              value: `\`\`\`${error?.stack || error}\`\`\``,
+              inline: false,
+            },
+          ],
+        });
+
         await interaction.editReply({
           content: '❌ Something went wrong while adding that book to your TBR.',
         });
@@ -233,7 +302,9 @@ module.exports = {
         { includePrivate: isSelf }
       );
 
-      const embed = buildTbrListEmbed(targetUser, entries, isSelf);
+      const embed = isSelf
+        ? buildOwnTbrEmbed(targetUser, entries)
+        : buildOtherUserTbrEmbed(targetUser, entries);
 
       return interaction.reply({
         embeds: [embed],
@@ -242,25 +313,38 @@ module.exports = {
     }
 
     if (subcommand === 'remove') {
-      const entryId = interaction.options.getString('entry_id', true);
+      const query = interaction.options.getString('query', true);
 
-      const removed = removeUserEntry(
+      const result = removeUserEntryByTitle(
         interaction.guildId,
         interaction.user.id,
-        entryId
+        query
       );
 
-      if (!removed) {
+      if (result.status === 'not_found') {
         return interaction.reply({
-          content: '❌ I could not find that Entry ID in your TBR.',
+          content: '❌ I could not find a matching book in your TBR.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      if (result.status === 'multiple_matches') {
+        const matchList = result.matches
+          .slice(0, 10)
+          .map((entry, index) => `**${index + 1}.** ${entry.book.title} by ${entry.book.authors?.join(', ') || 'Unknown Author'}`)
+          .join('\n');
+
+        return interaction.reply({
+          content:
+            `⚠️ I found multiple matches for \`${query}\` in your TBR.\nPlease be more specific:\n\n${matchList}`,
           flags: MessageFlags.Ephemeral,
         });
       }
 
       return interaction.reply({
-        content: `✅ Removed TBR entry \`${entryId}\`.`,
+        content: `✅ Removed **${result.entry.book.title}** from your TBR.`,
         flags: MessageFlags.Ephemeral,
       });
     }
-  },
+  }
 };

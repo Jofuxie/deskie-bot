@@ -1,3 +1,253 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "id": "tbr_1774493031054_66536",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "public",
+      "addedAt": "2026-03-26T02:43:51.054Z",
+      "book": {
+        "openLibraryKey": "/works/OL5738148W",
+        "title": "The Final Empire",
+        "subtitle": null,
+        "authors": [
+          "Brandon Sanderson"
+        ],
+        "publishedYear": "2001",
+        "publisher": "Unknown",
+        "language": "pol, spa, ger, por, cat, fre, chi, eng",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/14658160-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL5738148W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=The%20Final%20Empire%20Brandon%20Sanderson",
+        "editionCount": 44,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774493478418_24619",
+      "guildId": "1355931319384801361",
+      "userId": "1075224396559552613",
+      "username": "incyywincyy",
+      "visibility": "public",
+      "addedAt": "2026-03-26T02:51:18.418Z",
+      "book": {
+        "openLibraryKey": "/works/OL20831049W",
+        "title": "Sorcery of Thorns",
+        "subtitle": null,
+        "authors": [
+          "Margaret Rogerson"
+        ],
+        "publishedYear": "2019",
+        "publisher": "Unknown",
+        "language": "eng",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/10136514-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL20831049W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=Sorcery%20of%20Thorns%20Margaret%20Rogerson",
+        "editionCount": 9,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774493541600_16535",
+      "guildId": "1355931319384801361",
+      "userId": "1075224396559552613",
+      "username": "incyywincyy",
+      "visibility": "public",
+      "addedAt": "2026-03-26T02:52:21.600Z",
+      "book": {
+        "openLibraryKey": "/works/OL42545323W",
+        "title": "Tusk Love",
+        "subtitle": null,
+        "authors": [
+          "Thea Guanzon",
+          "Cast of Critical Role"
+        ],
+        "publishedYear": "2025",
+        "publisher": "Unknown",
+        "language": "eng",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/15168385-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL42545323W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=Tusk%20Love%20Thea%20Guanzon",
+        "editionCount": 2,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774494722644_69311",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "public",
+      "addedAt": "2026-03-26T03:12:02.644Z",
+      "book": {
+        "openLibraryKey": "/works/OL15358691W",
+        "title": "The Way of Kings",
+        "subtitle": null,
+        "authors": [
+          "Brandon Sanderson"
+        ],
+        "publishedYear": "2010",
+        "publisher": "Unknown",
+        "language": "pol, spa, ger, por, eng",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/14658316-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL15358691W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=The%20Way%20of%20Kings%20Brandon%20Sanderson",
+        "editionCount": 30,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774494760943_8610",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "private",
+      "addedAt": "2026-03-26T03:12:40.943Z",
+      "book": {
+        "openLibraryKey": "/works/OL25434351W",
+        "title": "Heated Rivalry",
+        "subtitle": null,
+        "authors": [
+          "Rachel Reid"
+        ],
+        "publishedYear": "2019",
+        "publisher": "Unknown",
+        "language": "eng",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/15152812-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL25434351W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=Heated%20Rivalry%20Rachel%20Reid",
+        "editionCount": 3,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774495225131_59892",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "public",
+      "addedAt": "2026-03-26T03:20:25.131Z",
+      "book": {
+        "openLibraryKey": "/works/OL54031W",
+        "title": "A Connecticut Yankee in King Arthur's Court",
+        "subtitle": null,
+        "authors": [
+          "Mark Twain"
+        ],
+        "publishedYear": "1889",
+        "publisher": "Unknown",
+        "language": "dut, ger, eng, pol, spa, rus, heb",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/9168732-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL54031W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=A%20Connecticut%20Yankee%20in%20King%20Arthur's%20Court%20Mark%20Twain",
+        "editionCount": 788,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774495260035_38538",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "public",
+      "addedAt": "2026-03-26T03:21:00.035Z",
+      "book": {
+        "openLibraryKey": "/works/OL36287W",
+        "title": "Le Comte de Monte Cristo",
+        "subtitle": null,
+        "authors": [
+          "Alexandre Dumas"
+        ],
+        "publishedYear": "1830",
+        "publisher": "Unknown",
+        "language": "dut, yid, fin, mul, ara, spa, tel, eng, arm, vie, und, por, jpn, ger, tgl, dan, guj, swe, mon, fre, jrb, chi, tur, pol, heb, ben, rus, ita",
+        "isbn": null,
+        "coverUrl": "https://covers.openlibrary.org/b/id/14566393-L.jpg",
+        "openLibraryLink": "https://openlibrary.org/works/OL36287W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=Le%20Comte%20de%20Monte%20Cristo%20Alexandre%20Dumas",
+        "editionCount": 734,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    },
+    {
+      "id": "tbr_1774495299093_64737",
+      "guildId": "1355931319384801361",
+      "userId": "296769162238492673",
+      "username": "taikignch",
+      "visibility": "public",
+      "addedAt": "2026-03-26T03:21:39.093Z",
+      "book": {
+        "openLibraryKey": "/works/OL5757120W",
+        "title": "Bram Stroker's Dracula",
+        "subtitle": null,
+        "authors": [
+          "John Spitzer"
+        ],
+        "publishedYear": "1989",
+        "publisher": "Unknown",
+        "language": "Unknown",
+        "isbn": null,
+        "coverUrl": null,
+        "openLibraryLink": "https://openlibrary.org/works/OL5757120W",
+        "goodreadsLink": "https://www.goodreads.com/search?q=Bram%20Stroker's%20Dracula%20John%20Spitzer",
+        "editionCount": 1,
+        "ratingsAverage": null,
+        "ratingsCount": null,
+        "wantToReadCount": null,
+        "alreadyReadCount": null,
+        "currentlyReadingCount": null,
+        "subject": [],
+        "description": "No description available."
+      }
+    }
+  ]
 }
