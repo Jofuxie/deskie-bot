@@ -1,7 +1,13 @@
 const cron = require('node-cron');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const DAILY_QUOTE_CHANNEL_ID = '1356144081524363305';
+const DAILY_QUOTE_HOUR = 8;
+const DAILY_QUOTE_MINUTE = 0;
+
+const stateFilePath = path.join(__dirname, '../data/dailyQuoteState.json');
 
 const headings = [
   "☀️ **Daily Check-In**",
@@ -25,11 +31,11 @@ const introLines = [
   "Good morning, clouders! Let’s begin today with something uplifting.",
   "A little reminder for this morning: you do not need to rush your growth.",
   "Take this as your gentle nudge to begin the day at your own pace.",
-  "Good morningg! Here’s a small thought to carry with you today.",
+  "Good morning! Here’s a small thought to carry with you today.",
   "A new day means a new chance to begin again, even softly.",
   "Here’s today’s warm little check-in from Deskie.",
   "Hey friends! Before you dive into the day, pause for this little reminder.",
-  "Good morningg! Let today begin with something kind and encouraging.",
+  "Good morning! Let today begin with something kind and encouraging.",
   "A soft start still counts as a strong start.",
   "Here’s something gentle for the morning before the day fully unfolds.",
 ];
@@ -47,7 +53,6 @@ const affirmationLines = [
   "💫 Keep going — softly is still going.",
 ];
 
-// Supported by API Ninjas:
 const quoteCategorySets = [
   { include: 'wisdom,inspirational,success', exclude: 'love' },
   { include: 'life,inspirational,courage', exclude: 'love' },
@@ -63,6 +68,68 @@ let lastHeading = null;
 let lastIntroLine = null;
 let lastAffirmationLine = null;
 let lastCategorySet = null;
+let dailyQuoteTask = null;
+
+function ensureStateFile() {
+  const folder = path.dirname(stateFilePath);
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+  }
+
+  if (!fs.existsSync(stateFilePath)) {
+    fs.writeFileSync(
+      stateFilePath,
+      JSON.stringify({ lastSentDate: null }, null, 2),
+      'utf8'
+    );
+  }
+}
+
+function readState() {
+  ensureStateFile();
+  return JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
+}
+
+function writeState(state) {
+  ensureStateFile();
+  fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2), 'utf8');
+}
+
+function getManilaNow() {
+  return new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
+  );
+}
+
+function getManilaDateString() {
+  const now = getManilaNow();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function hasAlreadySentToday() {
+  const state = readState();
+  return state.lastSentDate === getManilaDateString();
+}
+
+function markSentToday() {
+  const state = readState();
+  state.lastSentDate = getManilaDateString();
+  writeState(state);
+}
+
+function isPastScheduledTimeInManila() {
+  const now = getManilaNow();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  return (
+    currentHour > DAILY_QUOTE_HOUR ||
+    (currentHour === DAILY_QUOTE_HOUR && currentMinute >= DAILY_QUOTE_MINUTE)
+  );
+}
 
 function pickNonRepeatingRandom(list, lastValue) {
   const filtered = list.filter(item => item !== lastValue);
@@ -97,7 +164,7 @@ async function fetchFilteredQuote() {
   const apiKey = process.env.API_NINJAS_KEY;
 
   if (!apiKey) {
-    throw new Error('Missing API_NINJAS_KEY in .env');
+    throw new Error('Missing API_NINJAS_KEY in environment variables');
   }
 
   const categorySet = getRandomCategorySet();
@@ -169,8 +236,13 @@ async function fetchQuoteWithFallback() {
   }
 }
 
-async function sendDailyQuote(client) {
+async function sendDailyQuote(client, source = 'manual') {
   try {
+    if (source !== 'manual' && hasAlreadySentToday()) {
+      console.log(`[Daily Quote] Skipped (${source}) because today was already posted.`);
+      return;
+    }
+
     const channel = await client.channels.fetch(DAILY_QUOTE_CHANNEL_ID);
 
     if (!channel || !channel.isTextBased()) {
@@ -191,18 +263,44 @@ async function sendDailyQuote(client) {
       `${affirmationLine}`
     );
 
-    console.log('[Daily Quote] Sent successfully.');
+    if (source !== 'manual') {
+      markSentToday();
+    }
+
+    console.log(`[Daily Quote] Sent successfully via ${source}.`);
   } catch (error) {
     console.error('[Daily Quote] Failed to send quote:', error);
   }
 }
 
+async function catchUpMissedDailyQuote(client) {
+  if (!isPastScheduledTimeInManila()) {
+    console.log('[Daily Quote] Startup check: not past 8:00 AM Manila yet.');
+    return;
+  }
+
+  if (hasAlreadySentToday()) {
+    console.log('[Daily Quote] Startup check: today already sent.');
+    return;
+  }
+
+  console.log('[Daily Quote] Startup check: missed 8:00 AM post detected, sending catch-up now...');
+  await sendDailyQuote(client, 'startup-catchup');
+}
+
 function startDailyQuoteScheduler(client) {
-  cron.schedule(
-    '0 8 * * *',
+  if (dailyQuoteTask) {
+    dailyQuoteTask.stop();
+    dailyQuoteTask.destroy();
+  }
+
+  ensureStateFile();
+
+  dailyQuoteTask = cron.schedule(
+    '0 9 * * *',
     async () => {
       console.log('[Daily Quote] Running scheduled 8:00 AM post...');
-      await sendDailyQuote(client);
+      await sendDailyQuote(client, 'scheduled');
     },
     {
       timezone: 'Asia/Manila',
@@ -210,6 +308,9 @@ function startDailyQuoteScheduler(client) {
   );
 
   console.log('[Daily Quote] Scheduler started for 8:00 AM Asia/Manila.');
+  catchUpMissedDailyQuote(client).catch(error => {
+    console.error('[Daily Quote] Startup catch-up failed:', error);
+  });
 }
 
 module.exports = {
