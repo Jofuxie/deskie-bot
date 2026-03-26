@@ -399,6 +399,34 @@ async function getUserFinishedEntries(guildId, userId, { includePrivate = true }
   });
 }
 
+async function getReaderStatsData(guildId, userId, { includePrivate = false } = {}) {
+  const [currentReads, tbrEntries, finishedEntries] = await Promise.all([
+    getUserReadingEntries(guildId, userId, { includePrivate }),
+    getUserEntries(guildId, userId, { includePrivate, state: 'tbr' }),
+    getUserFinishedEntries(guildId, userId, { includePrivate }),
+  ]);
+
+  const sortedFinished = [...finishedEntries].sort((a, b) => {
+    const aTime = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+    const bTime = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return {
+    currentReads,
+    tbrEntries,
+    finishedEntries: sortedFinished,
+    currentReadsPreview: currentReads.slice(0, 3),
+    tbrPreview: tbrEntries.slice(0, 2),
+    latestFinished: sortedFinished[0] || null,
+    counts: {
+      currentReads: currentReads.length,
+      tbr: tbrEntries.length,
+      finished: sortedFinished.length,
+    },
+  };
+}
+
 module.exports = {
   addTbrEntry,
   getUserEntries,
@@ -414,4 +442,5 @@ module.exports = {
   finishReadingEntry,
   returnReadingEntryToTbr,
   getUserFinishedEntries,
+  getReaderStatsData,
 };
