@@ -160,7 +160,7 @@ function buildReaderStatsEmbed(targetUser, statsData) {
     },
     {
       name: '\u200B',
-      value: `*${affirmation}*\n\n— Deskie 🧸💗`,
+      value: `*${affirmation}*\n— Deskie 🧸💗`,
       inline: false,
     }
   );
