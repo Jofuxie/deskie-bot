@@ -3,14 +3,14 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const uri = process.env.MONGODB_URI;
 
-if (!uri) {
-  throw new Error('Missing MONGODB_URI in environment variables.');
-}
-
 let client;
 let db;
 
 async function connectToMongo() {
+  if (!uri) {
+    throw new Error('Missing MONGODB_URI in environment variables.');
+  }
+
   if (db) return db;
 
   client = new MongoClient(uri, {
