@@ -42,7 +42,7 @@ module.exports = {
     .setDMPermission(false),
 
   async execute(interaction) {
-    const entry = getRandomPublicEntry(interaction.guildId);
+    const entry = await getRandomPublicEntry(interaction.guildId);
 
     if (!entry) {
       return interaction.reply({
@@ -62,14 +62,6 @@ module.exports = {
         { name: 'First Published', value: book.publishedYear || 'Unknown', inline: true }
       )
       .setTimestamp();
-
-    if (book.ratingsAverage !== null) {
-      embed.addFields({
-        name: 'Open Library Rating',
-        value: `${book.ratingsAverage}/5${book.ratingsCount ? ` (${book.ratingsCount} ratings)` : ''}`,
-        inline: true,
-      });
-    }
 
     if (book.coverUrl) {
       embed.setThumbnail(book.coverUrl);

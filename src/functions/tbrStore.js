@@ -1,34 +1,5 @@
 // src/functions/tbrStore.js
-const fs = require('fs');
-const path = require('path');
-
-const dataDir = path.join(__dirname, '..', 'data');
-const tbrPath = path.join(dataDir, 'tbr.json');
-
-function ensureStore() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  if (!fs.existsSync(tbrPath)) {
-    fs.writeFileSync(
-      tbrPath,
-      JSON.stringify({ entries: [] }, null, 2),
-      'utf8'
-    );
-  }
-}
-
-function readStore() {
-  ensureStore();
-  const raw = fs.readFileSync(tbrPath, 'utf8');
-  return JSON.parse(raw);
-}
-
-function writeStore(data) {
-  ensureStore();
-  fs.writeFileSync(tbrPath, JSON.stringify(data, null, 2), 'utf8');
-}
+const { getTbrCollection } = require('./mongo');
 
 function makeEntryId() {
   return `tbr_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -38,8 +9,8 @@ function normalizeText(text = '') {
   return String(text).trim().toLowerCase();
 }
 
-function addTbrEntry({ guildId, userId, username, visibility, book }) {
-  const data = readStore();
+async function addTbrEntry({ guildId, userId, username, visibility, book }) {
+  const collection = await getTbrCollection();
 
   const entry = {
     id: makeEntryId(),
@@ -51,52 +22,42 @@ function addTbrEntry({ guildId, userId, username, visibility, book }) {
     book,
   };
 
-  data.entries.push(entry);
-  writeStore(data);
+  await collection.insertOne(entry);
   return entry;
 }
 
-function getUserEntries(guildId, userId, { includePrivate = false } = {}) {
-  const data = readStore();
+async function getUserEntries(guildId, userId, { includePrivate = false } = {}) {
+  const collection = await getTbrCollection();
 
-  return data.entries.filter((entry) => {
-    if (entry.guildId !== guildId) return false;
-    if (entry.userId !== userId) return false;
-    if (includePrivate) return true;
-    return entry.visibility === 'public';
+  const query = includePrivate
+    ? { guildId, userId }
+    : { guildId, userId, visibility: 'public' };
+
+  return collection.find(query).sort({ addedAt: 1 }).toArray();
+}
+
+async function getPublicGuildEntries(guildId) {
+  const collection = await getTbrCollection();
+  return collection.find({ guildId, visibility: 'public' }).toArray();
+}
+
+async function removeUserEntry(guildId, userId, entryId) {
+  const collection = await getTbrCollection();
+
+  const result = await collection.deleteOne({
+    guildId,
+    userId,
+    id: entryId,
   });
+
+  return result.deletedCount > 0;
 }
 
-function getPublicGuildEntries(guildId) {
-  const data = readStore();
-
-  return data.entries.filter(
-    (entry) => entry.guildId === guildId && entry.visibility === 'public'
-  );
-}
-
-function removeUserEntry(guildId, userId, entryId) {
-  const data = readStore();
-  const before = data.entries.length;
-
-  data.entries = data.entries.filter(
-    (entry) =>
-      !(
-        entry.guildId === guildId &&
-        entry.userId === userId &&
-        entry.id === entryId
-      )
-  );
-
-  writeStore(data);
-  return data.entries.length < before;
-}
-
-function findUserEntriesByTitle(guildId, userId, query) {
+async function findUserEntriesByTitle(guildId, userId, query) {
+  const entries = await getUserEntries(guildId, userId, { includePrivate: true });
   const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery) return [];
 
-  const entries = getUserEntries(guildId, userId, { includePrivate: true });
+  if (!normalizedQuery) return [];
 
   const exactMatches = entries.filter((entry) => {
     const title = normalizeText(entry.book?.title);
@@ -111,8 +72,8 @@ function findUserEntriesByTitle(guildId, userId, query) {
   });
 }
 
-function removeUserEntryByTitle(guildId, userId, query) {
-  const matches = findUserEntriesByTitle(guildId, userId, query);
+async function removeUserEntryByTitle(guildId, userId, query) {
+  const matches = await findUserEntriesByTitle(guildId, userId, query);
 
   if (!matches.length) {
     return { status: 'not_found' };
@@ -126,7 +87,7 @@ function removeUserEntryByTitle(guildId, userId, query) {
   }
 
   const target = matches[0];
-  const removed = removeUserEntry(guildId, userId, target.id);
+  const removed = await removeUserEntry(guildId, userId, target.id);
 
   if (!removed) {
     return { status: 'not_found' };
@@ -138,8 +99,8 @@ function removeUserEntryByTitle(guildId, userId, query) {
   };
 }
 
-function getRandomPublicEntry(guildId) {
-  const publicEntries = getPublicGuildEntries(guildId);
+async function getRandomPublicEntry(guildId) {
+  const publicEntries = await getPublicGuildEntries(guildId);
   if (!publicEntries.length) return null;
 
   const randomIndex = Math.floor(Math.random() * publicEntries.length);
