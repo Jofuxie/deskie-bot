@@ -31,7 +31,7 @@ function getProgressStatus(entry) {
 
   if (!totalPages || currentPage <= 0) {
     return {
-      label: '🔺 Just started!',
+      icon: '🔺',
       percent: 0,
     };
   }
@@ -40,20 +40,20 @@ function getProgressStatus(entry) {
 
   if (percent >= 85) {
     return {
-      label: '🔹 Almost done!',
+      icon: '🔹',
       percent,
     };
   }
 
   if (percent >= 35) {
     return {
-      label: '🔸 Getting there!',
+      icon: '🔸',
       percent,
     };
   }
 
   return {
-    label: '🔺 Just started!',
+    icon: '🔺',
     percent,
   };
 }
@@ -71,8 +71,7 @@ function buildReadingEntryText(entry, index) {
   const totalPages = entry.totalPages ?? 'Unknown';
 
   return [
-    `**${index}. ${title}**`,
-    `by ${authors}`,
+    `**${index}. ${title}**\nby ${authors}`,
     `${status.label} Reading Progress ~`,
     `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
     `*Page ${currentPage} / ${totalPages}*`,
