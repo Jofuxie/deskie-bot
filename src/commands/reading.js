@@ -71,7 +71,7 @@ function buildReadingEntryText(entry, index) {
   const totalPages = entry.totalPages ?? 'Unknown';
 
   return [
-    `**${index}. ${title}**\nby ${authors}`,
+    `**${index}. ${title}** — by ${authors}`,
     `${status.icon} Reading Progress ~`,
     `${buildProgressBar(currentPage, entry.totalPages)} **${status.percent}%**`,
     `*Page ${currentPage} / ${totalPages}*`,
