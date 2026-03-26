@@ -1,4 +1,3 @@
-// src/commands/readerstats.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -71,9 +70,12 @@ function formatCurrentReads(entries) {
     .join('\n');
 }
 
-function formatTbrPreview(entries) {
-  if (!entries.length) return 'No TBR books yet.';
-  return entries
+function formatTbrSection(entries, count) {
+  if (!entries.length) {
+    return 'No TBR books added yet.';
+  }
+
+  const preview = entries
     .slice(0, 2)
     .map((entry, index) => {
       const title = entry.book?.title || 'Unknown Title';
@@ -81,14 +83,26 @@ function formatTbrPreview(entries) {
       return `**${index + 1}.** ${title}\nby ${authors}`;
     })
     .join('\n\n');
+
+  return [
+    `${count} book${count === 1 ? '' : 's'}`,
+    '',
+    preview,
+  ].join('\n');
 }
 
-function formatLatestFinished(entry) {
+function formatLatestFinished(entry, finishedCount) {
   if (!entry) return 'No finished books yet.';
 
   const title = entry.book?.title || 'Unknown Title';
   const rating = entry.rating ? buildStars(entry.rating) : 'No rating yet';
-  return `**${title}**\n${rating}`;
+
+  return [
+    `${finishedCount} book${finishedCount === 1 ? '' : 's'}`,
+    '',
+    `**${title}**`,
+    rating,
+  ].join('\n');
 }
 
 function buildReaderStatsEmbed(targetUser, statsData) {
@@ -116,31 +130,19 @@ function buildReaderStatsEmbed(targetUser, statsData) {
       inline: false,
     },
     {
-      name: '🪵 TBR Count',
-      value: `${counts.tbr} book${counts.tbr === 1 ? '' : 's'}`,
-      inline: true,
+      name: '🪵 To Be Read',
+      value: formatTbrSection(tbrPreview, counts.tbr),
+      inline: false,
     },
     {
       name: '✨ Finished Books',
-      value: `${counts.finished} book${counts.finished === 1 ? '' : 's'}`,
-      inline: true,
-    },
-    {
-      name: '🌿 TBR Preview',
-      value: formatTbrPreview(tbrPreview),
-      inline: false,
-    },
-    {
-      name: '🏷 Latest Finish',
-      value: formatLatestFinished(latestFinished),
-      inline: false,
-    },
-    {
-      name: '🧸 Deskie Note',
-      value: chooseAffirmation(counts),
+      value: formatLatestFinished(latestFinished, counts.finished),
       inline: false,
     }
   );
+
+  const affirmation = chooseAffirmation(counts);
+  embed.setDescription(`*${affirmation}*\n\n- Deskie 🧸💗`);
 
   return embed;
 }
