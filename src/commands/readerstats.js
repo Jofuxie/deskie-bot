@@ -67,14 +67,14 @@ function getProgressLabel(entry) {
   const totalPages = Number(entry.totalPages) || 0;
 
   if (!totalPages || currentPage <= 0) {
-    return '🟡 Just started!';
+    return '▪ Just started!';
   }
 
   const percent = Math.round((currentPage / totalPages) * 100);
 
-  if (percent >= 85) return `🔴 Almost done! (${percent}%)`;
-  if (percent >= 35) return `🟠 Getting there! (${percent}%)`;
-  return `🟡 Just started! (${percent}%)`;
+  if (percent >= 85) return `● Almost done! (${percent}%)`;
+  if (percent >= 35) return `◍ Getting there! (${percent}%)`;
+  return `▪ Just started! (${percent}%)`;
 }
 
 function formatCurrentReads(entries) {
@@ -125,6 +125,7 @@ function formatLatestFinished(entry, finishedCount) {
 
 function buildReaderStatsEmbed(targetUser, statsData) {
   const { currentReadsPreview, tbrPreview, latestFinished, counts } = statsData;
+  const affirmation = chooseAffirmation(counts);
 
   const embed = new EmbedBuilder()
     .setTitle(`📚 ${targetUser.username}'s Library Card ~`)
@@ -156,13 +157,13 @@ function buildReaderStatsEmbed(targetUser, statsData) {
       name: '✨ Finished Books',
       value: formatLatestFinished(latestFinished, counts.finished),
       inline: false,
+    },
+    {
+      name: '\u200B',
+      value: `*${affirmation}*\n\n— Deskie 🧸💗`,
+      inline: false,
     }
   );
-
-  const affirmation = chooseAffirmation(counts);
-  embed.setFooter({
-    text: `${affirmation} ー Deskie 🧸💗`,
-  });
 
   return embed;
 }
