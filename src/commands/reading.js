@@ -52,17 +52,12 @@ function buildReadingEntryText(entry, index) {
 
 function buildReadingViewEmbed(user, entries, isSelf) {
   const embed = new EmbedBuilder()
-    .setTitle(
-      isSelf
-        ? `📚 ${user.username}'s Current Reads`
-        : `📚 ${user.username}'s Public Current Reads`
-    )
+    .setTitle(`📚 ${user.username}'s Current Reads`)
     .setColor(0xA78B6D)
     .setTimestamp();
 
   if (!entries.length) {
-    embed.setDescription(
-      isSelf ? 'No active reads yet.' : 'No public active reads found for this user.'
+    embed.setDescription('No active reads found for this user.'
     );
     return embed;
   }
@@ -265,18 +260,16 @@ module.exports = {
 
     if (subcommand === 'view') {
       const targetUser = interaction.options.getUser('user') || interaction.user;
-      const isSelf = targetUser.id === interaction.user.id;
 
       try {
         const entries = await getUserReadingEntries(
           interaction.guildId,
           targetUser.id,
-          { includePrivate: isSelf }
+          { includePrivate: false }
         );
 
         return interaction.reply({
           embeds: [buildReadingViewEmbed(targetUser, entries, isSelf)],
-          flags: isSelf ? MessageFlags.Ephemeral : undefined,
         });
       } catch (error) {
         await sendLog(interaction.client, {
