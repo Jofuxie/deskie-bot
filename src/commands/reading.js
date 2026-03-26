@@ -45,20 +45,25 @@ function buildReadingEntryText(entry, index) {
   const progressBar = buildProgressBar(entry.currentPage ?? 0, entry.totalPages);
 
   return [
-    `**${index}. ${title}**`,
-    `by ${authors}`,
+    `**${index}. ${title}**\nby ${authors}`,
     progressBar,
   ].join('\n');
 }
 
-function buildReadingViewEmbed(user, entries) {
+function buildReadingViewEmbed(user, entries, isSelf) {
   const embed = new EmbedBuilder()
-    .setTitle(`📚 ${user.username}'s Current Reads`)
+    .setTitle(
+      isSelf
+        ? `📚 ${user.username}'s Current Reads`
+        : `📚 ${user.username}'s Public Current Reads`
+    )
     .setColor(0xA78B6D)
     .setTimestamp();
 
   if (!entries.length) {
-    embed.setDescription('No active reads yet.');
+    embed.setDescription(
+      isSelf ? 'No active reads yet.' : 'No public active reads found for this user.'
+    );
     return embed;
   }
 
@@ -148,7 +153,13 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription('View your current reads.')
+        .setDescription('View current reads.')
+        .addUserOption(option =>
+          option
+            .setName('user')
+            .setDescription('Whose current reads do you want to view?')
+            .setRequired(false)
+        )
     )
     .addSubcommand(subcommand =>
       subcommand
@@ -253,16 +264,19 @@ module.exports = {
     }
 
     if (subcommand === 'view') {
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      const isSelf = targetUser.id === interaction.user.id;
+
       try {
         const entries = await getUserReadingEntries(
           interaction.guildId,
-          interaction.user.id,
-          { includePrivate: true }
+          targetUser.id,
+          { includePrivate: isSelf }
         );
 
         return interaction.reply({
-          embeds: [buildReadingViewEmbed(interaction.user, entries)],
-          flags: MessageFlags.Ephemeral,
+          embeds: [buildReadingViewEmbed(targetUser, entries, isSelf)],
+          flags: isSelf ? MessageFlags.Ephemeral : undefined,
         });
       } catch (error) {
         await sendLog(interaction.client, {
@@ -272,7 +286,7 @@ module.exports = {
         });
 
         return interaction.reply({
-          content: '❌ Something went wrong while loading your current reads.',
+          content: '❌ Something went wrong while loading current reads.',
           flags: MessageFlags.Ephemeral,
         }).catch(() => null);
       }
@@ -326,7 +340,7 @@ module.exports = {
 
         return interaction.reply({
           embeds: [buildProgressUpdatedEmbed(result.entry)],
-          flags: MessageFlags.Ephemeral,
+          flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
         });
       } catch (error) {
         await sendLog(interaction.client, {
@@ -383,7 +397,7 @@ module.exports = {
 
         return interaction.reply({
           embeds: [buildFinishedEmbed(result.entry)],
-          flags: MessageFlags.Ephemeral,
+          flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
         });
       } catch (error) {
         await sendLog(interaction.client, {
