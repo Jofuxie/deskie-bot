@@ -104,7 +104,7 @@ function formatTbrSection(entries, count) {
     .join('\n');
 
   return [
-    `* **${count}** books in the pile *`,
+    `**${count}** *books in the pile *`,
     preview,
   ].join('\n');
 }
