@@ -1,4 +1,3 @@
-// src/commands/tbr.js
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -42,6 +41,14 @@ function buildTbrEntryEmbed(entry, titlePrefix = '📚 TBR Entry') {
     });
   }
 
+  if (book.publisher && book.publisher !== 'Unknown') {
+    embed.addFields({
+      name: 'Publisher',
+      value: book.publisher,
+      inline: true,
+    });
+  }
+
   return embed;
 }
 
@@ -67,12 +74,14 @@ function buildBookButtons(book) {
   }
 
   if (!buttons.length) return [];
+
   return [new ActionRowBuilder().addComponents(buttons.slice(0, 5))];
 }
 
 function formatEntryLine(entry, index) {
   const authorText = entry.book.authors?.join(', ') || 'Unknown Author';
   const published = entry.book.publishedYear ? ` (${entry.book.publishedYear})` : '';
+
   return `**${index}. ${entry.book.title}**${published}\nby ${authorText}`;
 }
 
@@ -90,18 +99,26 @@ function buildOwnTbrEmbed(user, entries) {
     return embed;
   }
 
+  embed.setDescription('Here’s your current TBR, split by visibility.');
+
   embed.addFields(
     {
       name: '🌍 Public',
       value: publicEntries.length
-        ? publicEntries.slice(0, 10).map((entry, index) => formatEntryLine(entry, index + 1)).join('\n\n')
+        ? publicEntries
+            .slice(0, 10)
+            .map((entry, index) => formatEntryLine(entry, index + 1))
+            .join('\n\n')
         : 'No public books yet.',
       inline: false,
     },
     {
       name: '🔒 Private',
       value: privateEntries.length
-        ? privateEntries.slice(0, 10).map((entry, index) => formatEntryLine(entry, index + 1)).join('\n\n')
+        ? privateEntries
+            .slice(0, 10)
+            .map((entry, index) => formatEntryLine(entry, index + 1))
+            .join('\n\n')
         : 'No private books yet.',
       inline: false,
     }
@@ -122,7 +139,10 @@ function buildOtherUserTbrEmbed(user, entries) {
   }
 
   embed.setDescription(
-    entries.slice(0, 15).map((entry, index) => formatEntryLine(entry, index + 1)).join('\n\n')
+    entries
+      .slice(0, 15)
+      .map((entry, index) => formatEntryLine(entry, index + 1))
+      .join('\n\n')
   );
 
   return embed;
@@ -222,10 +242,41 @@ module.exports = {
           components,
         });
       } catch (error) {
+        console.error('tbr add error:', error);
+
         await sendLog(interaction.client, {
           title: '❌ TBR Add Error',
           color: 0xED4245,
-          description: `\`\`\`${error?.stack || error}\`\`\``,
+          description: 'Error while adding a book to TBR.',
+          fields: [
+            {
+              name: 'User',
+              value: `${interaction.user.tag} (${interaction.user.id})`,
+              inline: false,
+            },
+            {
+              name: 'Query',
+              value: query,
+              inline: false,
+            },
+            {
+              name: 'Visibility',
+              value: visibility,
+              inline: true,
+            },
+            {
+              name: 'Guild',
+              value: interaction.guild
+                ? `${interaction.guild.name} (${interaction.guild.id})`
+                : 'DM / Unknown',
+              inline: false,
+            },
+            {
+              name: 'Error',
+              value: `\`\`\`${error?.stack || error}\`\`\``,
+              inline: false,
+            },
+          ],
         });
 
         await interaction.editReply({
@@ -243,7 +294,10 @@ module.exports = {
       const entries = await getUserEntries(
         interaction.guildId,
         targetUser.id,
-        { includePrivate: isSelf }
+        {
+          includePrivate: isSelf,
+          state: 'tbr',
+        }
       );
 
       const embed = isSelf
@@ -279,7 +333,8 @@ module.exports = {
           .join('\n');
 
         return interaction.reply({
-          content: `⚠️ I found multiple matches for \`${query}\` in your TBR.\nPlease be more specific:\n\n${matchList}`,
+          content:
+            `⚠️ I found multiple matches for \`${query}\` in your TBR.\nPlease be more specific:\n\n${matchList}`,
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -289,5 +344,5 @@ module.exports = {
         flags: MessageFlags.Ephemeral,
       });
     }
-  }
+  },
 };
