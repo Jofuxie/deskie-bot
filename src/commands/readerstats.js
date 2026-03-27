@@ -35,9 +35,11 @@ function pickRandom(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
 
-function buildStars(rating) {
-  const safeRating = Math.max(1, Math.min(5, Number(rating) || 1));
-  return '⭐'.repeat(safeRating);
+function buildRatingDisplay(rating) {
+  const numeric = Number(rating) || 0;
+  const fullStars = Math.floor(numeric);
+  const starText = '⭐'.repeat(Math.max(0, fullStars));
+  return `${starText || '⭐'} · **${numeric}/5**`;
 }
 
 function chooseAffirmation(stats) {
@@ -67,7 +69,7 @@ function getProgressLabel(entry) {
   const totalPages = Number(entry.totalPages) || 0;
 
   if (!totalPages || currentPage <= 0) {
-    return '▪ Just started!';
+    return '🔺 Just started! (0%)';
   }
 
   const percent = Math.round((currentPage / totalPages) * 100);
@@ -114,18 +116,29 @@ function formatFinishedSection(entries, count) {
     return 'No finished books yet.';
   }
 
-  const preview = entries
-    .slice(0, 2)
-    .map((entry, index, array) => {
+  const previewEntries = entries.slice(0, 2);
+
+  const preview = previewEntries
+    .map((entry, index) => {
       const title = entry.book?.title || 'Unknown Title';
       const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
-      const rating = entry.rating ? buildStars(entry.rating) : 'No rating yet';
-      const line = index === array.length - 1 ? '╙' : '╟';
+      const rating = entry.rating ? buildRatingDisplay(entry.rating) : 'No rating yet';
+      const isOnly = previewEntries.length === 1;
+      const isLast = index === previewEntries.length - 1;
 
-      return [
-        `${line} **${title}**, by ${authors}`,
-        `║╰ *Personal Rating:* ${rating}`,
-      ].join('\n');
+      const titleLine = isOnly
+        ? `╙ **${title}**, by ${authors}`
+        : isLast
+          ? `╙ **${title}**, by ${authors}`
+          : `╟ **${title}**, by ${authors}`;
+
+      const ratingLine = isOnly
+        ? `╰ *Personal Rating:* ${rating}`
+        : isLast
+          ? `╰ *Personal Rating:* ${rating}`
+          : `║╰ *Personal Rating:* ${rating}`;
+
+      return [titleLine, ratingLine].join('\n');
     })
     .join('\n');
 
