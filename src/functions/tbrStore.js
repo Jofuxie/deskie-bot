@@ -40,14 +40,15 @@ function parseFinishedDate(dateInput) {
 
   const trimmed = String(dateInput).trim();
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+  if (!/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
     return {
       ok: false,
       reason: 'invalid_format',
     };
   }
 
-  const parsed = new Date(`${trimmed}T12:00:00.000Z`);
+  const [month, day, year] = trimmed.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
   if (Number.isNaN(parsed.getTime())) {
     return {
@@ -56,7 +57,6 @@ function parseFinishedDate(dateInput) {
     };
   }
 
-  const [year, month, day] = trimmed.split('-').map(Number);
   const utcYear = parsed.getUTCFullYear();
   const utcMonth = parsed.getUTCMonth() + 1;
   const utcDay = parsed.getUTCDate();
@@ -72,6 +72,19 @@ function parseFinishedDate(dateInput) {
     ok: true,
     iso: parsed.toISOString(),
   };
+}
+
+function isValidRating(value) {
+  const numericRating = Number(value);
+  return Number.isFinite(numericRating)
+    && numericRating >= 0.5
+    && numericRating <= 5
+    && numericRating % 0.5 === 0;
+}
+
+async function getUserEntryById(guildId, userId, entryId) {
+  const collection = await getTbrCollection();
+  return collection.findOne({ guildId, userId, id: entryId });
 }
 
 async function findExistingExactEntry(guildId, userId, title, { excludeId = null } = {}) {
@@ -124,6 +137,7 @@ async function addTbrEntry({ guildId, userId, username, visibility, book }) {
     currentPage: null,
     totalPages: cleanedBook.totalPages,
     rating: null,
+    reviewText: null,
     book: cleanedBook,
   };
 
@@ -397,6 +411,185 @@ async function updateReadingProgress(guildId, userId, query, page) {
   };
 }
 
+async function markReadingEntryFinishedNowById(guildId, userId, entryId) {
+  const existing = await getUserEntryById(guildId, userId, entryId);
+
+  if (!existing) {
+    return { status: 'not_found' };
+  }
+
+  if (existing.state === 'finished') {
+    return {
+      status: 'already_finished',
+      entry: existing,
+    };
+  }
+
+  if (existing.state !== 'reading') {
+    return { status: 'not_reading' };
+  }
+
+  const collection = await getTbrCollection();
+  const finishedAt = new Date().toISOString();
+  const totalPages = existing.totalPages ?? existing.book?.totalPages ?? null;
+
+  const result = await collection.findOneAndUpdate(
+    {
+      guildId,
+      userId,
+      id: entryId,
+      state: 'reading',
+    },
+    {
+      $set: {
+        state: 'finished',
+        finishedAt,
+        rating: null,
+        reviewText: null,
+        currentPage: totalPages ?? existing.currentPage ?? null,
+        totalPages,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return { status: 'not_found' };
+  }
+
+  return {
+    status: 'finished_now',
+    entry: result,
+  };
+}
+
+async function updateFinishedReviewById(guildId, userId, entryId, {
+  rating,
+  reviewText,
+  finishedDateInput = null,
+} = {}) {
+  const existing = await getUserEntryById(guildId, userId, entryId);
+
+  if (!existing || existing.state !== 'finished') {
+    return { status: 'not_found' };
+  }
+
+  const update = {};
+
+  if (rating !== undefined) {
+    if (!isValidRating(rating)) {
+      return { status: 'invalid_rating' };
+    }
+    update.rating = Number(rating);
+  }
+
+  if (reviewText !== undefined) {
+    const cleanedReview = String(reviewText || '').trim();
+    update.reviewText = cleanedReview || null;
+  }
+
+  if (finishedDateInput) {
+    const parsedDate = parseFinishedDate(finishedDateInput);
+    if (!parsedDate.ok) {
+      return { status: 'invalid_finished_date' };
+    }
+    update.finishedAt = parsedDate.iso;
+  }
+
+  if (!Object.keys(update).length) {
+    return {
+      status: 'no_changes',
+      entry: existing,
+    };
+  }
+
+  const collection = await getTbrCollection();
+  const result = await collection.findOneAndUpdate(
+    {
+      guildId,
+      userId,
+      id: entryId,
+      state: 'finished',
+    },
+    {
+      $set: update,
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return { status: 'not_found' };
+  }
+
+  return {
+    status: 'updated',
+    entry: result,
+  };
+}
+
+async function updateFinishedReviewByTitle(guildId, userId, query, options = {}) {
+  const matches = await findUserEntriesByTitle(guildId, userId, query, {
+    state: 'finished',
+    includePrivate: true,
+  });
+
+  if (!matches.length) {
+    return { status: 'not_found' };
+  }
+
+  if (matches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches,
+    };
+  }
+
+  return updateFinishedReviewById(guildId, userId, matches[0].id, options);
+}
+
+async function finalizeEntryToFinished(entry, rating, finishedDateInput = null, reviewText = null) {
+  if (!isValidRating(rating)) {
+    return { status: 'invalid_rating' };
+  }
+
+  const parsedDate = parseFinishedDate(finishedDateInput);
+  if (!parsedDate.ok) {
+    return { status: 'invalid_finished_date' };
+  }
+
+  const collection = await getTbrCollection();
+  const totalPages = entry.totalPages ?? entry.book?.totalPages ?? null;
+
+  const result = await collection.findOneAndUpdate(
+    {
+      guildId: entry.guildId,
+      userId: entry.userId,
+      id: entry.id,
+      state: entry.state,
+    },
+    {
+      $set: {
+        state: 'finished',
+        finishedAt: parsedDate.iso,
+        rating: Number(rating),
+        reviewText: reviewText ? String(reviewText).trim() || null : null,
+        currentPage: totalPages ?? entry.currentPage ?? null,
+        totalPages,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return { status: 'not_found' };
+  }
+
+  return {
+    status: 'finished',
+    entry: result,
+  };
+}
+
 async function finishReadingEntry(guildId, userId, query, rating, finishedDateInput = null) {
   const matches = await findUserEntriesByTitle(guildId, userId, query, {
     state: 'reading',
@@ -451,6 +644,7 @@ async function returnReadingEntryToTbr(guildId, userId, query) {
         currentPage: null,
         finishedAt: null,
         rating: null,
+        reviewText: null,
       },
     },
     { returnDocument: 'after' }
@@ -473,53 +667,6 @@ async function getUserFinishedEntries(guildId, userId, { includePrivate = true }
   });
 }
 
-async function finalizeEntryToFinished(entry, rating, finishedDateInput = null) {
-  const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
-    return { status: 'invalid_rating' };
-  }
-
-  if (numericRating % 0.5 !== 0) {
-    return { status: 'invalid_rating' };
-  }
-
-  const parsedDate = parseFinishedDate(finishedDateInput);
-  if (!parsedDate.ok) {
-    return { status: 'invalid_finished_date' };
-  }
-
-  const collection = await getTbrCollection();
-  const totalPages = entry.totalPages ?? entry.book?.totalPages ?? null;
-
-  const result = await collection.findOneAndUpdate(
-    {
-      guildId: entry.guildId,
-      userId: entry.userId,
-      id: entry.id,
-      state: entry.state,
-    },
-    {
-      $set: {
-        state: 'finished',
-        finishedAt: parsedDate.iso,
-        rating: numericRating,
-        currentPage: totalPages ?? entry.currentPage ?? null,
-        totalPages,
-      },
-    },
-    { returnDocument: 'after' }
-  );
-
-  if (!result) {
-    return { status: 'not_found' };
-  }
-
-  return {
-    status: 'finished',
-    entry: result,
-  };
-}
-
 async function createFinishedEntryDirect({
   guildId,
   userId,
@@ -528,13 +675,9 @@ async function createFinishedEntryDirect({
   book,
   rating,
   finishedDateInput = null,
+  reviewText = null,
 }) {
-  const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
-    return { status: 'invalid_rating' };
-  }
-
-  if (numericRating % 0.5 !== 0) {
+  if (!isValidRating(rating)) {
     return { status: 'invalid_rating' };
   }
 
@@ -559,7 +702,8 @@ async function createFinishedEntryDirect({
     finishedAt: parsedDate.iso,
     currentPage: cleanedBook.totalPages ?? null,
     totalPages: cleanedBook.totalPages,
-    rating: numericRating,
+    rating: Number(rating),
+    reviewText: reviewText ? String(reviewText).trim() || null : null,
     book: cleanedBook,
   };
 
@@ -580,13 +724,9 @@ async function logFinishedBook({
   visibility = 'public',
   book = null,
   finishedDateInput = null,
+  reviewText = null,
 }) {
-  const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
-    return { status: 'invalid_rating' };
-  }
-
-  if (numericRating % 0.5 !== 0) {
+  if (!isValidRating(rating)) {
     return { status: 'invalid_rating' };
   }
 
@@ -608,7 +748,7 @@ async function logFinishedBook({
   }
 
   if (readingMatches.length === 1) {
-    return finalizeEntryToFinished(readingMatches[0], numericRating, finishedDateInput);
+    return finalizeEntryToFinished(readingMatches[0], rating, finishedDateInput, reviewText);
   }
 
   const tbrMatches = await findUserEntriesByTitle(guildId, userId, query, {
@@ -624,7 +764,7 @@ async function logFinishedBook({
   }
 
   if (tbrMatches.length === 1) {
-    return finalizeEntryToFinished(tbrMatches[0], numericRating, finishedDateInput);
+    return finalizeEntryToFinished(tbrMatches[0], rating, finishedDateInput, reviewText);
   }
 
   const finishedMatches = await findUserEntriesByTitle(guildId, userId, query, {
@@ -660,7 +800,7 @@ async function logFinishedBook({
   }
 
   if (exactExisting?.state === 'reading' || exactExisting?.state === 'tbr') {
-    return finalizeEntryToFinished(exactExisting, numericRating, finishedDateInput);
+    return finalizeEntryToFinished(exactExisting, rating, finishedDateInput, reviewText);
   }
 
   return createFinishedEntryDirect({
@@ -669,8 +809,9 @@ async function logFinishedBook({
     username,
     visibility,
     book,
-    rating: numericRating,
+    rating,
     finishedDateInput,
+    reviewText,
   });
 }
 
@@ -719,5 +860,9 @@ module.exports = {
   getUserFinishedEntries,
   getReaderStatsData,
   findExistingExactEntry,
+  getUserEntryById,
+  markReadingEntryFinishedNowById,
+  updateFinishedReviewById,
+  updateFinishedReviewByTitle,
   logFinishedBook,
 };

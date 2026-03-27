@@ -2,15 +2,16 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   MessageFlags,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 
-const { getBestBookMatch } = require('../functions/bookData');
 const {
   startReadingEntry,
   getUserReadingEntries,
   updateReadingProgress,
   returnReadingEntryToTbr,
-  logFinishedBook,
 } = require('../functions/tbrStore');
 const { sendLog } = require('../functions/discordLogger');
 
@@ -57,13 +58,6 @@ function getProgressStatus(entry) {
     icon: '🔺',
     percent,
   };
-}
-
-function buildRatingDisplay(rating) {
-  const numeric = Number(rating) || 0;
-  const fullStars = Math.floor(numeric);
-  const starText = '⭐'.repeat(Math.max(0, fullStars));
-  return `${starText || '⭐'} · **${numeric}/5**`;
 }
 
 function buildReadingEntryText(entry, index) {
@@ -141,31 +135,6 @@ function buildProgressUpdatedEmbed(entry) {
     .setTimestamp();
 }
 
-function buildFinishedEmbed(entry) {
-  const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
-
-  return new EmbedBuilder()
-    .setTitle(`🎉 Finished: ${entry.book?.title || 'Unknown Title'}`)
-    .setColor(0x57F287)
-    .setDescription(`by ${authors}`)
-    .addFields(
-      {
-        name: 'Rating',
-        value: buildRatingDisplay(entry.rating),
-        inline: true,
-      },
-      {
-        name: 'Completed',
-        value: entry.finishedAt
-          ? `<t:${Math.floor(new Date(entry.finishedAt).getTime() / 1000)}:D>`
-          : 'Unknown',
-        inline: true,
-      }
-    )
-    .setThumbnail(entry.book?.coverUrl || null)
-    .setTimestamp();
-}
-
 function buildReturnedToTbrEmbed(entry) {
   const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
 
@@ -175,6 +144,21 @@ function buildReturnedToTbrEmbed(entry) {
     .setDescription(`by ${authors}`)
     .setThumbnail(entry.book?.coverUrl || null)
     .setTimestamp();
+}
+
+function buildCompletionButtons(entry, userId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`bookreview_complete_now|${entry.id}|${userId}`)
+        .setLabel('Mark Finished & Review')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`bookreview_review_later|${entry.id}|${userId}`)
+        .setLabel('Review Later')
+        .setStyle(ButtonStyle.Secondary)
+    ),
+  ];
 }
 
 module.exports = {
@@ -219,41 +203,6 @@ module.exports = {
             .setDescription('Current page number')
             .setRequired(true)
             .setMinValue(0)
-        )
-    )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('finish')
-        .setDescription('Mark a book as finished, even if it was not tracked in current reads.')
-        .addStringOption(option =>
-          option
-            .setName('query')
-            .setDescription('Book title you want to log as finished')
-            .setRequired(true)
-        )
-        .addNumberOption(option =>
-          option
-            .setName('rating')
-            .setDescription('Your rating from 0.5 to 5.0')
-            .setRequired(true)
-            .addChoices(
-              { name: '⭐ 0.5', value: 0.5 },
-              { name: '⭐ 1', value: 1 },
-              { name: '⭐ 1.5', value: 1.5 },
-              { name: '⭐⭐ 2', value: 2 },
-              { name: '⭐⭐ 2.5', value: 2.5 },
-              { name: '⭐⭐⭐ 3', value: 3 },
-              { name: '⭐⭐⭐ 3.5', value: 3.5 },
-              { name: '⭐⭐⭐⭐ 4', value: 4 },
-              { name: '⭐⭐⭐⭐ 4.5', value: 4.5 },
-              { name: '⭐⭐⭐⭐⭐ 5', value: 5 }
-            )
-        )
-        .addStringOption(option =>
-          option
-            .setName('date')
-            .setDescription('Optional completion date in YYYY-MM-DD format')
-            .setRequired(false)
         )
     )
     .addSubcommand(subcommand =>
@@ -412,6 +361,20 @@ module.exports = {
           });
         }
 
+        const isComplete = Boolean(
+          result.entry.totalPages
+          && result.entry.currentPage >= result.entry.totalPages
+        );
+
+        if (isComplete) {
+          return interaction.reply({
+            content: `✨ You made it to the end of **${result.entry.book.title}**! Choose how you'd like to log it below.`,
+            embeds: [buildProgressUpdatedEmbed(result.entry)],
+            components: buildCompletionButtons(result.entry, interaction.user.id),
+            flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
+          });
+        }
+
         return interaction.reply({
           embeds: [buildProgressUpdatedEmbed(result.entry)],
           flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
@@ -425,95 +388,6 @@ module.exports = {
 
         return interaction.reply({
           content: '❌ Something went wrong while updating progress.',
-          flags: MessageFlags.Ephemeral,
-        }).catch(() => null);
-      }
-    }
-
-    if (subcommand === 'finish') {
-      const query = interaction.options.getString('query', true);
-      const rating = interaction.options.getNumber('rating', true);
-      const date = interaction.options.getString('date');
-
-      try {
-        let result = await logFinishedBook({
-          guildId: interaction.guildId,
-          userId: interaction.user.id,
-          username: interaction.user.username,
-          query,
-          rating,
-          visibility: 'public',
-          finishedDateInput: date,
-        });
-
-        if (result.status === 'not_found') {
-          const book = await getBestBookMatch(query);
-
-          if (!book) {
-            return interaction.reply({
-              content: '❌ I could not find a matching book to log as finished.',
-              flags: MessageFlags.Ephemeral,
-            });
-          }
-
-          result = await logFinishedBook({
-            guildId: interaction.guildId,
-            userId: interaction.user.id,
-            username: interaction.user.username,
-            query,
-            rating,
-            visibility: 'public',
-            book,
-            finishedDateInput: date,
-          });
-        }
-
-        if (result.status === 'multiple_matches') {
-          const matchList = result.matches
-            .slice(0, 10)
-            .map((entry, index) => `**${index + 1}.** ${entry.book.title} by ${entry.book.authors?.join(', ') || 'Unknown Author'}`)
-            .join('\n');
-
-          return interaction.reply({
-            content: `⚠️ I found multiple matching books for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-
-        if (result.status === 'invalid_rating') {
-          return interaction.reply({
-            content: '❌ Rating must be from 0.5 to 5 in 0.5 steps.',
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-
-        if (result.status === 'invalid_finished_date') {
-          return interaction.reply({
-            content: '❌ Please use a valid date in `YYYY-MM-DD` format.',
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-
-        if (result.status === 'already_finished') {
-          return interaction.reply({
-            content: `⚠️ **${result.entry.book.title}** is already in your finished books.`,
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-
-        return interaction.reply({
-          embeds: [buildFinishedEmbed(result.entry)],
-          flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
-        });
-      } catch (error) {
-        await sendLog(interaction.client, {
-          title: '❌ Reading Finish Error',
-          color: 0xED4245,
-          description: `\`\`\`${error?.stack || error}\`\`\``,
-        });
-
-        return interaction.reply({
-          content: '❌ Something went wrong while logging that finished book.',
           flags: MessageFlags.Ephemeral,
         }).catch(() => null);
       }
