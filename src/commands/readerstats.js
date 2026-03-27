@@ -72,9 +72,9 @@ function getProgressLabel(entry) {
 
   const percent = Math.round((currentPage / totalPages) * 100);
 
-  if (percent >= 85) return `● Almost done! (${percent}%)`;
-  if (percent >= 35) return `◍ Getting there! (${percent}%)`;
-  return `▪ Just started! (${percent}%)`;
+  if (percent >= 85) return `🔹 Almost done! (${percent}%)`;
+  if (percent >= 35) return `🔸 Getting there! (${percent}%)`;
+  return `🔺 Just started! (${percent}%)`;
 }
 
 function formatCurrentReads(entries) {
@@ -109,22 +109,41 @@ function formatTbrSection(entries, count) {
   ].join('\n');
 }
 
-function formatLatestFinished(entry, finishedCount) {
-  if (!entry) return 'No finished books yet.';
+function formatFinishedSection(entries, count) {
+  if (!entries.length) {
+    return 'No finished books yet.';
+  }
 
-  const title = entry.book?.title || 'Unknown Title';
-  const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
-  const rating = entry.rating ? buildStars(entry.rating) : 'No rating yet';
+  const preview = entries
+    .slice(0, 2)
+    .map((entry, index, array) => {
+      const title = entry.book?.title || 'Unknown Title';
+      const authors = entry.book?.authors?.join(', ') || 'Unknown Author';
+      const rating = entry.rating ? buildStars(entry.rating) : 'No rating yet';
+      const line = index === array.length - 1 ? '╙' : '╟';
+
+      return [
+        `${line} **${title}**, by ${authors}`,
+        `║╰ *Personal Rating:* ${rating}`,
+      ].join('\n');
+    })
+    .join('\n');
 
   return [
-    `**${finishedCount}** *books completed, hooray!*`,
-    `└ **${title}**, by ${authors}`,
-    `  ${rating}`,
+    `**${count}** *books completed, hooray!*`,
+    preview,
   ].join('\n');
 }
 
 function buildReaderStatsEmbed(targetUser, statsData) {
-  const { currentReadsPreview, tbrPreview, latestFinished, counts } = statsData;
+  const {
+    currentReadsPreview,
+    tbrPreview,
+    finishedEntries,
+    latestFinished,
+    counts,
+  } = statsData;
+
   const affirmation = chooseAffirmation(counts);
 
   const embed = new EmbedBuilder()
@@ -155,7 +174,7 @@ function buildReaderStatsEmbed(targetUser, statsData) {
     },
     {
       name: '✨ Finished Books',
-      value: formatLatestFinished(latestFinished, counts.finished),
+      value: formatFinishedSection(finishedEntries, counts.finished),
       inline: false,
     },
     {
