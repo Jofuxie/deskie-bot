@@ -30,6 +30,50 @@ function getStateLabel(state) {
   return 'TBR';
 }
 
+function parseFinishedDate(dateInput) {
+  if (!dateInput) {
+    return {
+      ok: true,
+      iso: new Date().toISOString(),
+    };
+  }
+
+  const trimmed = String(dateInput).trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return {
+      ok: false,
+      reason: 'invalid_format',
+    };
+  }
+
+  const parsed = new Date(`${trimmed}T12:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return {
+      ok: false,
+      reason: 'invalid_date',
+    };
+  }
+
+  const [year, month, day] = trimmed.split('-').map(Number);
+  const utcYear = parsed.getUTCFullYear();
+  const utcMonth = parsed.getUTCMonth() + 1;
+  const utcDay = parsed.getUTCDate();
+
+  if (utcYear !== year || utcMonth !== month || utcDay !== day) {
+    return {
+      ok: false,
+      reason: 'invalid_date',
+    };
+  }
+
+  return {
+    ok: true,
+    iso: parsed.toISOString(),
+  };
+}
+
 async function findExistingExactEntry(guildId, userId, title, { excludeId = null } = {}) {
   const collection = await getTbrCollection();
   const entries = await collection.find({ guildId, userId }).toArray();
@@ -353,7 +397,7 @@ async function updateReadingProgress(guildId, userId, query, page) {
   };
 }
 
-async function finishReadingEntry(guildId, userId, query, rating) {
+async function finishReadingEntry(guildId, userId, query, rating, finishedDateInput = null) {
   const matches = await findUserEntriesByTitle(guildId, userId, query, {
     state: 'reading',
     includePrivate: true,
@@ -370,43 +414,7 @@ async function finishReadingEntry(guildId, userId, query, rating) {
     };
   }
 
-  const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
-    return { status: 'invalid_rating' };
-  }
-
-  const target = matches[0];
-  const collection = await getTbrCollection();
-  const finishedAt = new Date().toISOString();
-  const totalPages = target.totalPages ?? target.book?.totalPages ?? null;
-
-  const result = await collection.findOneAndUpdate(
-    {
-      guildId,
-      userId,
-      id: target.id,
-      state: 'reading',
-    },
-    {
-      $set: {
-        state: 'finished',
-        finishedAt,
-        rating: numericRating,
-        currentPage: totalPages ?? target.currentPage ?? null,
-        totalPages,
-      },
-    },
-    { returnDocument: 'after' }
-  );
-
-  if (!result) {
-    return { status: 'not_found' };
-  }
-
-  return {
-    status: 'finished',
-    entry: result,
-  };
+  return finalizeEntryToFinished(matches[0], rating, finishedDateInput);
 }
 
 async function returnReadingEntryToTbr(guildId, userId, query) {
@@ -465,14 +473,22 @@ async function getUserFinishedEntries(guildId, userId, { includePrivate = true }
   });
 }
 
-async function finalizeEntryToFinished(entry, rating) {
+async function finalizeEntryToFinished(entry, rating, finishedDateInput = null) {
   const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
     return { status: 'invalid_rating' };
   }
 
+  if (numericRating % 0.5 !== 0) {
+    return { status: 'invalid_rating' };
+  }
+
+  const parsedDate = parseFinishedDate(finishedDateInput);
+  if (!parsedDate.ok) {
+    return { status: 'invalid_finished_date' };
+  }
+
   const collection = await getTbrCollection();
-  const finishedAt = new Date().toISOString();
   const totalPages = entry.totalPages ?? entry.book?.totalPages ?? null;
 
   const result = await collection.findOneAndUpdate(
@@ -485,7 +501,7 @@ async function finalizeEntryToFinished(entry, rating) {
     {
       $set: {
         state: 'finished',
-        finishedAt,
+        finishedAt: parsedDate.iso,
         rating: numericRating,
         currentPage: totalPages ?? entry.currentPage ?? null,
         totalPages,
@@ -511,10 +527,20 @@ async function createFinishedEntryDirect({
   visibility = 'public',
   book,
   rating,
+  finishedDateInput = null,
 }) {
   const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
     return { status: 'invalid_rating' };
+  }
+
+  if (numericRating % 0.5 !== 0) {
+    return { status: 'invalid_rating' };
+  }
+
+  const parsedDate = parseFinishedDate(finishedDateInput);
+  if (!parsedDate.ok) {
+    return { status: 'invalid_finished_date' };
   }
 
   const cleanedBook = pickBookFields(book);
@@ -530,7 +556,7 @@ async function createFinishedEntryDirect({
     state: 'finished',
     addedAt: now,
     startedAt: null,
-    finishedAt: now,
+    finishedAt: parsedDate.iso,
     currentPage: cleanedBook.totalPages ?? null,
     totalPages: cleanedBook.totalPages,
     rating: numericRating,
@@ -553,10 +579,20 @@ async function logFinishedBook({
   rating,
   visibility = 'public',
   book = null,
+  finishedDateInput = null,
 }) {
   const numericRating = Number(rating);
-  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+  if (!Number.isFinite(numericRating) || numericRating < 0.5 || numericRating > 5) {
     return { status: 'invalid_rating' };
+  }
+
+  if (numericRating % 0.5 !== 0) {
+    return { status: 'invalid_rating' };
+  }
+
+  const parsedDate = parseFinishedDate(finishedDateInput);
+  if (!parsedDate.ok) {
+    return { status: 'invalid_finished_date' };
   }
 
   const readingMatches = await findUserEntriesByTitle(guildId, userId, query, {
@@ -572,7 +608,7 @@ async function logFinishedBook({
   }
 
   if (readingMatches.length === 1) {
-    return finalizeEntryToFinished(readingMatches[0], numericRating);
+    return finalizeEntryToFinished(readingMatches[0], numericRating, finishedDateInput);
   }
 
   const tbrMatches = await findUserEntriesByTitle(guildId, userId, query, {
@@ -588,7 +624,7 @@ async function logFinishedBook({
   }
 
   if (tbrMatches.length === 1) {
-    return finalizeEntryToFinished(tbrMatches[0], numericRating);
+    return finalizeEntryToFinished(tbrMatches[0], numericRating, finishedDateInput);
   }
 
   const finishedMatches = await findUserEntriesByTitle(guildId, userId, query, {
@@ -624,7 +660,7 @@ async function logFinishedBook({
   }
 
   if (exactExisting?.state === 'reading' || exactExisting?.state === 'tbr') {
-    return finalizeEntryToFinished(exactExisting, numericRating);
+    return finalizeEntryToFinished(exactExisting, numericRating, finishedDateInput);
   }
 
   return createFinishedEntryDirect({
@@ -634,6 +670,7 @@ async function logFinishedBook({
     visibility,
     book,
     rating: numericRating,
+    finishedDateInput,
   });
 }
 

@@ -59,9 +59,11 @@ function getProgressStatus(entry) {
   };
 }
 
-function buildStars(rating) {
-  const safeRating = Math.max(1, Math.min(5, Number(rating) || 1));
-  return '⭐'.repeat(safeRating);
+function buildRatingDisplay(rating) {
+  const numeric = Number(rating) || 0;
+  const fullStars = Math.floor(numeric);
+  const starText = '⭐'.repeat(Math.max(0, fullStars));
+  return `${starText || '⭐'} · **${numeric}/5**`;
 }
 
 function buildReadingEntryText(entry, index) {
@@ -149,7 +151,7 @@ function buildFinishedEmbed(entry) {
     .addFields(
       {
         name: 'Rating',
-        value: buildStars(entry.rating),
+        value: buildRatingDisplay(entry.rating),
         inline: true,
       },
       {
@@ -229,18 +231,29 @@ module.exports = {
             .setDescription('Book title you want to log as finished')
             .setRequired(true)
         )
-        .addIntegerOption(option =>
+        .addNumberOption(option =>
           option
             .setName('rating')
-            .setDescription('Your rating from 1 to 5')
+            .setDescription('Your rating from 0.5 to 5.0')
             .setRequired(true)
             .addChoices(
+              { name: '⭐ 0.5', value: 0.5 },
               { name: '⭐ 1', value: 1 },
+              { name: '⭐ 1.5', value: 1.5 },
               { name: '⭐⭐ 2', value: 2 },
+              { name: '⭐⭐ 2.5', value: 2.5 },
               { name: '⭐⭐⭐ 3', value: 3 },
+              { name: '⭐⭐⭐ 3.5', value: 3.5 },
               { name: '⭐⭐⭐⭐ 4', value: 4 },
+              { name: '⭐⭐⭐⭐ 4.5', value: 4.5 },
               { name: '⭐⭐⭐⭐⭐ 5', value: 5 }
             )
+        )
+        .addStringOption(option =>
+          option
+            .setName('date')
+            .setDescription('Optional completion date in YYYY-MM-DD format')
+            .setRequired(false)
         )
     )
     .addSubcommand(subcommand =>
@@ -419,7 +432,8 @@ module.exports = {
 
     if (subcommand === 'finish') {
       const query = interaction.options.getString('query', true);
-      const rating = interaction.options.getInteger('rating', true);
+      const rating = interaction.options.getNumber('rating', true);
+      const date = interaction.options.getString('date');
 
       try {
         let result = await logFinishedBook({
@@ -429,6 +443,7 @@ module.exports = {
           query,
           rating,
           visibility: 'public',
+          finishedDateInput: date,
         });
 
         if (result.status === 'not_found') {
@@ -449,6 +464,7 @@ module.exports = {
             rating,
             visibility: 'public',
             book,
+            finishedDateInput: date,
           });
         }
 
@@ -466,7 +482,14 @@ module.exports = {
 
         if (result.status === 'invalid_rating') {
           return interaction.reply({
-            content: '❌ Rating must be between 1 and 5.',
+            content: '❌ Rating must be from 0.5 to 5 in 0.5 steps.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (result.status === 'invalid_finished_date') {
+          return interaction.reply({
+            content: '❌ Please use a valid date in `YYYY-MM-DD` format.',
             flags: MessageFlags.Ephemeral,
           });
         }
