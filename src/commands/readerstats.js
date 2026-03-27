@@ -117,6 +117,7 @@ function formatFinishedSection(entries, count) {
   }
 
   const previewEntries = entries.slice(0, 2);
+  const indent = ' '; // figure space for cleaner visual alignment
 
   const preview = previewEntries
     .map((entry, index) => {
@@ -133,9 +134,9 @@ function formatFinishedSection(entries, count) {
           : `╟ **${title}**, by ${authors}`;
 
       const ratingLine = isOnly
-        ? `╰ *Personal Rating:* ${rating}`
+        ? `${indent}╰ *Personal Rating:* ${rating}`
         : isLast
-          ? `╰ *Personal Rating:* ${rating}`
+          ? `${indent}╰ *Personal Rating:* ${rating}`
           : `║╰ *Personal Rating:* ${rating}`;
 
       return [titleLine, ratingLine].join('\n');
