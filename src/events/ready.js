@@ -9,19 +9,12 @@ module.exports = {
   name: Events.ClientReady,
   once: true,
   async execute(client) {
-    // ✅ Startup confirmation
     console.log(`🚀 Deskie is online as ${client.user.tag}`);
 
-    // 1. Initial presence
     client.user.setActivity('starting up...', { type: ActivityType.Playing });
 
-    // 2. Start rotating presence messages
     pickPresence(client);
 
-    // 3. Start daily quote scheduler
-    startDailyQuoteScheduler(client);
-
-    // 4. Warm up MongoDB connection
     try {
       await connectToMongo();
       console.log('✅ MongoDB connected successfully.');
@@ -35,20 +28,19 @@ module.exports = {
       });
     }
 
-    // 5. Confirm Discord logger works
+    startDailyQuoteScheduler(client);
+
     await sendLog(client, {
       title: '✅ Deskie Started',
       color: 0x57F287,
       description: `Deskie is online as \`${client.user.tag}\``,
     });
 
-    // 6. Optional guild debug check
     const myGuildId = '1355931319384801361';
     const guild = client.guilds.cache.get(myGuildId);
 
     if (guild) {
       const everyoneRoleId = guild.roles.everyone.id;
-
       console.log(`📌 Connected to: ${guild.name}`);
       console.log(`🆔 @everyone Role ID: ${everyoneRoleId}`);
     } else {

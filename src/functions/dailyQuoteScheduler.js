@@ -1,14 +1,11 @@
 const cron = require('node-cron');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const { connectToMongo } = require('./mongo');
+const { sendLog } = require('./discordLogger');
 
-const DAILY_QUOTE_CHANNEL_ID = '1356144081524363305';
 const DAILY_QUOTE_HOUR = 8;
 const DAILY_QUOTE_MINUTE = 0;
 const CATCH_UP_END_HOUR = 10; // catch-up allowed only before 10:00 AM Manila time
-
-const stateFilePath = path.join(__dirname, '../data/dailyQuoteState.json');
 
 const headings = [
   "☀️ **Daily Check-In**",
@@ -71,30 +68,9 @@ let lastAffirmationLine = null;
 let lastCategorySet = null;
 let dailyQuoteTask = null;
 
-function ensureStateFile() {
-  const folder = path.dirname(stateFilePath);
-
-  if (!fs.existsSync(folder)) {
-    fs.mkdirSync(folder, { recursive: true });
-  }
-
-  if (!fs.existsSync(stateFilePath)) {
-    fs.writeFileSync(
-      stateFilePath,
-      JSON.stringify({ lastSentDate: null }, null, 2),
-      'utf8'
-    );
-  }
-}
-
-function readState() {
-  ensureStateFile();
-  return JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
-}
-
-function writeState(state) {
-  ensureStateFile();
-  fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2), 'utf8');
+async function getBotStateCollection() {
+  const db = await connectToMongo();
+  return db.collection('botState');
 }
 
 function getManilaNow() {
@@ -111,15 +87,40 @@ function getManilaDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function hasAlreadySentToday() {
-  const state = readState();
+async function readState() {
+  const collection = await getBotStateCollection();
+  const state = await collection.findOne({ key: 'dailyQuote' });
+
+  return state || {
+    key: 'dailyQuote',
+    lastSentDate: null,
+  };
+}
+
+async function writeState(nextState) {
+  const collection = await getBotStateCollection();
+
+  await collection.updateOne(
+    { key: 'dailyQuote' },
+    {
+      $set: {
+        key: 'dailyQuote',
+        lastSentDate: nextState.lastSentDate ?? null,
+      },
+    },
+    { upsert: true }
+  );
+}
+
+async function hasAlreadySentToday() {
+  const state = await readState();
   return state.lastSentDate === getManilaDateString();
 }
 
-function markSentToday() {
-  const state = readState();
+async function markSentToday() {
+  const state = await readState();
   state.lastSentDate = getManilaDateString();
-  writeState(state);
+  await writeState(state);
 }
 
 function isPastScheduledTimeInManila() {
@@ -140,7 +141,8 @@ function isStillWithinCatchUpWindow() {
 
 function pickNonRepeatingRandom(list, lastValue) {
   const filtered = list.filter(item => item !== lastValue);
-  return filtered[Math.floor(Math.random() * filtered.length)];
+  const source = filtered.length ? filtered : list;
+  return source[Math.floor(Math.random() * source.length)];
 }
 
 function getRandomHeading() {
@@ -245,16 +247,21 @@ async function fetchQuoteWithFallback() {
 
 async function sendDailyQuote(client, source = 'manual') {
   try {
-    if (source !== 'manual' && hasAlreadySentToday()) {
+    const channelId = process.env.DAILY_QUOTE_CHANNEL_ID;
+
+    if (!channelId) {
+      throw new Error('Missing DAILY_QUOTE_CHANNEL_ID in environment variables');
+    }
+
+    if (source !== 'manual' && await hasAlreadySentToday()) {
       console.log(`[Daily Quote] Skipped (${source}) because today was already posted.`);
       return;
     }
 
-    const channel = await client.channels.fetch(DAILY_QUOTE_CHANNEL_ID);
+    const channel = await client.channels.fetch(channelId).catch(() => null);
 
     if (!channel || !channel.isTextBased()) {
-      console.error('[Daily Quote] Invalid channel.');
-      return;
+      throw new Error(`Invalid or inaccessible daily quote channel: ${channelId}`);
     }
 
     const quote = await fetchQuoteWithFallback();
@@ -271,12 +278,36 @@ async function sendDailyQuote(client, source = 'manual') {
     );
 
     if (source !== 'manual') {
-      markSentToday();
+      await markSentToday();
     }
 
     console.log(`[Daily Quote] Sent successfully via ${source}.`);
+
+    await sendLog(client, {
+      title: '☀️ Daily Quote Sent',
+      color: 0x57F287,
+      description: `Daily quote sent via \`${source}\`.`,
+      fields: [
+        {
+          name: 'Channel ID',
+          value: channelId,
+          inline: false,
+        },
+        {
+          name: 'Date (Manila)',
+          value: getManilaDateString(),
+          inline: true,
+        },
+      ],
+    });
   } catch (error) {
     console.error('[Daily Quote] Failed to send quote:', error);
+
+    await sendLog(client, {
+      title: '❌ Daily Quote Error',
+      color: 0xED4245,
+      description: `\`\`\`${error?.stack || error}\`\`\``,
+    });
   }
 }
 
@@ -291,7 +322,7 @@ async function catchUpMissedDailyQuote(client) {
     return;
   }
 
-  if (hasAlreadySentToday()) {
+  if (await hasAlreadySentToday()) {
     console.log('[Daily Quote] Startup check: today already sent.');
     return;
   }
@@ -306,8 +337,6 @@ function startDailyQuoteScheduler(client) {
     dailyQuoteTask.destroy();
   }
 
-  ensureStateFile();
-
   dailyQuoteTask = cron.schedule(
     '0 8 * * *',
     async () => {
@@ -321,8 +350,20 @@ function startDailyQuoteScheduler(client) {
 
   console.log('[Daily Quote] Scheduler started for 8:00 AM Asia/Manila.');
 
-  catchUpMissedDailyQuote(client).catch(error => {
+  sendLog(client, {
+    title: '🕗 Daily Quote Scheduler Started',
+    color: 0x5865F2,
+    description: 'Scheduler armed for 8:00 AM Asia/Manila.',
+  }).catch(() => null);
+
+  catchUpMissedDailyQuote(client).catch(async error => {
     console.error('[Daily Quote] Startup catch-up failed:', error);
+
+    await sendLog(client, {
+      title: '❌ Daily Quote Catch-Up Error',
+      color: 0xED4245,
+      description: `\`\`\`${error?.stack || error}\`\`\``,
+    });
   });
 }
 
