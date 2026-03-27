@@ -4,12 +4,13 @@ const {
   MessageFlags,
 } = require('discord.js');
 
+const { getBestBookMatch } = require('../functions/bookData');
 const {
   startReadingEntry,
   getUserReadingEntries,
   updateReadingProgress,
-  finishReadingEntry,
   returnReadingEntryToTbr,
+  logFinishedBook,
 } = require('../functions/tbrStore');
 const { sendLog } = require('../functions/discordLogger');
 
@@ -221,11 +222,11 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('finish')
-        .setDescription('Mark one of your current reads as finished.')
+        .setDescription('Mark a book as finished, even if it was not tracked in current reads.')
         .addStringOption(option =>
           option
             .setName('query')
-            .setDescription('Book title from your current reads')
+            .setDescription('Book title you want to log as finished')
             .setRequired(true)
         )
         .addIntegerOption(option =>
@@ -421,17 +422,33 @@ module.exports = {
       const rating = interaction.options.getInteger('rating', true);
 
       try {
-        const result = await finishReadingEntry(
-          interaction.guildId,
-          interaction.user.id,
+        let result = await logFinishedBook({
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          username: interaction.user.username,
           query,
-          rating
-        );
+          rating,
+          visibility: 'public',
+        });
 
         if (result.status === 'not_found') {
-          return interaction.reply({
-            content: '❌ I could not find that book in your current reads.',
-            flags: MessageFlags.Ephemeral,
+          const book = await getBestBookMatch(query);
+
+          if (!book) {
+            return interaction.reply({
+              content: '❌ I could not find a matching book to log as finished.',
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+
+          result = await logFinishedBook({
+            guildId: interaction.guildId,
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            query,
+            rating,
+            visibility: 'public',
+            book,
           });
         }
 
@@ -442,7 +459,7 @@ module.exports = {
             .join('\n');
 
           return interaction.reply({
-            content: `⚠️ I found multiple current-read matches for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
+            content: `⚠️ I found multiple matching books for \`${query}\`.\nPlease be more specific:\n\n${matchList}`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -450,6 +467,13 @@ module.exports = {
         if (result.status === 'invalid_rating') {
           return interaction.reply({
             content: '❌ Rating must be between 1 and 5.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (result.status === 'already_finished') {
+          return interaction.reply({
+            content: `⚠️ **${result.entry.book.title}** is already in your finished books.`,
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -466,7 +490,7 @@ module.exports = {
         });
 
         return interaction.reply({
-          content: '❌ Something went wrong while finishing that book.',
+          content: '❌ Something went wrong while logging that finished book.',
           flags: MessageFlags.Ephemeral,
         }).catch(() => null);
       }

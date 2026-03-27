@@ -465,6 +465,178 @@ async function getUserFinishedEntries(guildId, userId, { includePrivate = true }
   });
 }
 
+async function finalizeEntryToFinished(entry, rating) {
+  const numericRating = Number(rating);
+  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+    return { status: 'invalid_rating' };
+  }
+
+  const collection = await getTbrCollection();
+  const finishedAt = new Date().toISOString();
+  const totalPages = entry.totalPages ?? entry.book?.totalPages ?? null;
+
+  const result = await collection.findOneAndUpdate(
+    {
+      guildId: entry.guildId,
+      userId: entry.userId,
+      id: entry.id,
+      state: entry.state,
+    },
+    {
+      $set: {
+        state: 'finished',
+        finishedAt,
+        rating: numericRating,
+        currentPage: totalPages ?? entry.currentPage ?? null,
+        totalPages,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) {
+    return { status: 'not_found' };
+  }
+
+  return {
+    status: 'finished',
+    entry: result,
+  };
+}
+
+async function createFinishedEntryDirect({
+  guildId,
+  userId,
+  username,
+  visibility = 'public',
+  book,
+  rating,
+}) {
+  const numericRating = Number(rating);
+  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+    return { status: 'invalid_rating' };
+  }
+
+  const cleanedBook = pickBookFields(book);
+  const collection = await getTbrCollection();
+  const now = new Date().toISOString();
+
+  const entry = {
+    id: makeEntryId(),
+    guildId,
+    userId,
+    username,
+    visibility,
+    state: 'finished',
+    addedAt: now,
+    startedAt: null,
+    finishedAt: now,
+    currentPage: cleanedBook.totalPages ?? null,
+    totalPages: cleanedBook.totalPages,
+    rating: numericRating,
+    book: cleanedBook,
+  };
+
+  await collection.insertOne(entry);
+
+  return {
+    status: 'finished',
+    entry,
+  };
+}
+
+async function logFinishedBook({
+  guildId,
+  userId,
+  username,
+  query,
+  rating,
+  visibility = 'public',
+  book = null,
+}) {
+  const numericRating = Number(rating);
+  if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+    return { status: 'invalid_rating' };
+  }
+
+  const readingMatches = await findUserEntriesByTitle(guildId, userId, query, {
+    state: 'reading',
+    includePrivate: true,
+  });
+
+  if (readingMatches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches: readingMatches,
+    };
+  }
+
+  if (readingMatches.length === 1) {
+    return finalizeEntryToFinished(readingMatches[0], numericRating);
+  }
+
+  const tbrMatches = await findUserEntriesByTitle(guildId, userId, query, {
+    state: 'tbr',
+    includePrivate: true,
+  });
+
+  if (tbrMatches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches: tbrMatches,
+    };
+  }
+
+  if (tbrMatches.length === 1) {
+    return finalizeEntryToFinished(tbrMatches[0], numericRating);
+  }
+
+  const finishedMatches = await findUserEntriesByTitle(guildId, userId, query, {
+    state: 'finished',
+    includePrivate: true,
+  });
+
+  if (finishedMatches.length > 1) {
+    return {
+      status: 'multiple_matches',
+      matches: finishedMatches,
+    };
+  }
+
+  if (finishedMatches.length === 1) {
+    return {
+      status: 'already_finished',
+      entry: finishedMatches[0],
+    };
+  }
+
+  if (!book) {
+    return { status: 'not_found' };
+  }
+
+  const exactExisting = await findExistingExactEntry(guildId, userId, book.title);
+
+  if (exactExisting?.state === 'finished') {
+    return {
+      status: 'already_finished',
+      entry: exactExisting,
+    };
+  }
+
+  if (exactExisting?.state === 'reading' || exactExisting?.state === 'tbr') {
+    return finalizeEntryToFinished(exactExisting, numericRating);
+  }
+
+  return createFinishedEntryDirect({
+    guildId,
+    userId,
+    username,
+    visibility,
+    book,
+    rating: numericRating,
+  });
+}
+
 async function getReaderStatsData(guildId, userId, { includePrivate = false } = {}) {
   const [currentReads, tbrEntries, finishedEntries] = await Promise.all([
     getUserReadingEntries(guildId, userId, { includePrivate }),
@@ -510,4 +682,5 @@ module.exports = {
   getUserFinishedEntries,
   getReaderStatsData,
   findExistingExactEntry,
+  logFinishedBook,
 };
