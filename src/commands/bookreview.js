@@ -32,7 +32,7 @@ function buildFinishedEmbed(entry, titlePrefix = '🎉 Finished') {
         inline: true,
       },
       {
-        name: 'Completed',
+        name: 'Date Finished',
         value: entry.finishedAt
           ? `<t:${Math.floor(new Date(entry.finishedAt).getTime() / 1000)}:D>`
           : 'Unknown',
@@ -153,7 +153,9 @@ module.exports = {
       const date = interaction.options.getString('date');
       const review = interaction.options.getString('review');
 
-      await interaction.deferReply();
+      await interaction.deferReply({
+        flags: MessageFlags.Ephemeral,
+      });
 
       try {
         let result = await logFinishedBook({
@@ -218,8 +220,21 @@ module.exports = {
           });
         }
 
+        const embed = buildFinishedEmbed(result.entry);
+
+        if (result.entry.visibility === 'private') {
+          return interaction.editReply({
+            embeds: [embed],
+          });
+        }
+
+        await interaction.followUp({
+          content: `${interaction.user} completed and reviewed **${result.entry.book.title}**.`,
+          embeds: [embed],
+        });
+
         return interaction.editReply({
-          embeds: [buildFinishedEmbed(result.entry)],
+          content: '✅ Posted your completed review publicly.',
         });
       } catch (error) {
         await sendLog(interaction.client, {
@@ -299,9 +314,18 @@ module.exports = {
           });
         }
 
+        const embed = buildFinishedEmbed(result.entry, '📝 Updated Review');
+
+        if (result.entry.visibility === 'private') {
+          return interaction.reply({
+            embeds: [embed],
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
         return interaction.reply({
-          embeds: [buildFinishedEmbed(result.entry, '📝 Updated Review')],
-          flags: MessageFlags.Ephemeral,
+          content: `${interaction.user} updated their review of: **${result.entry.book.title}**`,
+          embeds: [embed],
         });
       } catch (error) {
         await sendLog(interaction.client, {

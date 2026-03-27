@@ -36,7 +36,7 @@ function buildFinishedEmbed(entry, titlePrefix = '🎉 Finished') {
         inline: true,
       },
       {
-        name: 'Completed',
+        name: 'Date Finished',
         value: entry.finishedAt
           ? `<t:${Math.floor(new Date(entry.finishedAt).getTime() / 1000)}:D>`
           : 'Unknown',
@@ -527,9 +527,18 @@ module.exports = {
             });
           }
 
+          const embed = buildFinishedEmbed(result.entry, '📝 Updated Review');
+
+          if (result.entry.visibility === 'private') {
+            return interaction.reply({
+              embeds: [embed],
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+
           return interaction.reply({
-            embeds: [buildFinishedEmbed(result.entry, '📝 Review Saved')],
-            flags: result.entry.visibility === 'private' ? MessageFlags.Ephemeral : undefined,
+            content: `${interaction.user} updated their review of: **${result.entry.book?.title || 'that book'}**`,
+            embeds: [embed],
           });
         } catch (error) {
           await sendLog(interaction.client, {
