@@ -7,11 +7,6 @@ const {
 
 const VC_CHAT_CHANNEL_ID = '1485991365686067453';
 
-const STARTER_MESSAGE =
-  '🌿 **VC side chat refreshed.**\n' +
-  'A fresh space for today’s reading session, coworking, or side chatter.\n' +
-  'Feel free to drop your thoughts here again hehe. ☕📚';
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('refreshvcchat')
@@ -22,7 +17,9 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const channel = await interaction.client.channels.fetch(VC_CHAT_CHANNEL_ID).catch(() => null);
+    const channel = await interaction.client.channels
+      .fetch(VC_CHAT_CHANNEL_ID)
+      .catch(() => null);
 
     if (!channel) {
       return interaction.editReply({
@@ -48,9 +45,8 @@ module.exports = {
       while (true) {
         const fetched = await channel.messages.fetch({ limit: 100 });
 
-        const toDelete = fetched.filter(
-          (msg) => !msg.author.bot && !msg.pinned
-        );
+        // Delete everything except pinned messages
+        const toDelete = fetched.filter((msg) => !msg.pinned);
 
         if (toDelete.size === 0) break;
 
@@ -86,12 +82,20 @@ module.exports = {
         if (fetched.size < 100) break;
       }
 
-      await channel.send(STARTER_MESSAGE);
+      const refreshedAt = Math.floor(Date.now() / 1000);
+
+      await channel.send({
+        content:
+          `🌿 **VC side chat refreshed.**\n` +
+          `A fresh space for today’s reading session, coworking, or side chatter.\n` +
+          `Feel free to drop your thoughts here again hehe.\n\n` +
+          `🕒 Refreshed: <t:${refreshedAt}:F>`,
+      });
 
       return interaction.editReply({
         content:
           `✅ VC side chat refreshed successfully.\n` +
-          `Deleted **${totalDeletedCount}** user message(s) and posted a fresh starter message.`,
+          `Deleted **${totalDeletedCount}** message(s) and posted a fresh starter message.`,
       });
     } catch (error) {
       console.error('[refreshvcchat] refresh failed:', error);

@@ -13,7 +13,8 @@ async function wipeVcChat(channel) {
   while (true) {
     const fetched = await channel.messages.fetch({ limit: 100 });
 
-    const toDelete = fetched.filter(msg => !msg.author.bot && !msg.pinned);
+    // Delete everything except pinned messages
+    const toDelete = fetched.filter(msg => !msg.pinned);
     if (toDelete.size === 0) break;
 
     const now = Date.now();
@@ -22,6 +23,7 @@ async function wipeVcChat(channel) {
     const within14Days = toDelete.filter(
       msg => now - msg.createdTimestamp < twoWeeksMs
     );
+
     const olderThan14Days = toDelete.filter(
       msg => now - msg.createdTimestamp >= twoWeeksMs
     );
@@ -63,12 +65,14 @@ async function refreshVcChat(client) {
     }
 
     const deletedCount = await wipeVcChat(targetChannel);
+    const refreshedAt = Math.floor(Date.now() / 1000);
 
     const refreshMessage = await targetChannel.send({
       content:
-        `☁️ **VC Chat Refreshed**\n` +
-        `A fresh clean slate for today’s side chat is hereee.\n\n` +
-        `Feel free to drop your current read, thoughts, or little check-ins here 📚✨`,
+        `🌿 **VC side chat refreshed.**\n` +
+        `A fresh space for today’s reading session, coworking, or side chatter.\n` +
+        `Feel free to drop your thoughts here again hehe.\n\n` +
+        `🕒 Refreshed: <t:${refreshedAt}:F>`,
     });
 
     await sendLog(client, {
@@ -84,6 +88,11 @@ async function refreshVcChat(client) {
         {
           name: 'Deleted Messages',
           value: String(deletedCount),
+          inline: true,
+        },
+        {
+          name: 'Refreshed At',
+          value: `<t:${refreshedAt}:F>`,
           inline: true,
         },
         {
