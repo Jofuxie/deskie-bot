@@ -2,6 +2,7 @@
 const { Events, ActivityType } = require('discord.js');
 const pickPresence = require('../functions/pickPresence');
 const { startDailyQuoteScheduler } = require('../functions/dailyQuoteScheduler');
+const { startVcChatRefreshScheduler } = require('../functions/vcChatRefreshScheduler');
 const { sendLog } = require('../functions/discordLogger');
 const { connectToMongo } = require('../functions/mongo');
 
@@ -28,7 +29,31 @@ module.exports = {
       });
     }
 
-    startDailyQuoteScheduler(client);
+    try {
+      startDailyQuoteScheduler(client);
+      console.log('✅ Daily quote scheduler started.');
+    } catch (error) {
+      console.error('❌ Failed to start daily quote scheduler:', error);
+
+      await sendLog(client, {
+        title: '❌ Daily Quote Scheduler Error',
+        color: 0xED4245,
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+      });
+    }
+
+    try {
+      startVcChatRefreshScheduler(client);
+      console.log('✅ VC chat refresh scheduler started.');
+    } catch (error) {
+      console.error('❌ Failed to start VC chat refresh scheduler:', error);
+
+      await sendLog(client, {
+        title: '❌ VC Chat Refresh Scheduler Error',
+        color: 0xED4245,
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+      });
+    }
 
     await sendLog(client, {
       title: '✅ Deskie Started',
