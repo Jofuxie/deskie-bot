@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { sendLog } = require('./discordLogger');
 
 const TARGET_CHANNEL_ID = '1485991365686067453'; // VC side chat
-const REFRESH_HOUR = 0; // 12 AM Manila
+const REFRESH_HOUR = 5; // 5 AM Manila
 const REFRESH_MINUTE = 0;
 
 let vcRefreshTask = null;
