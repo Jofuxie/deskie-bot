@@ -84,6 +84,11 @@ function buildReviewModal(entryId, userId) {
     );
 }
 
+function getEmojiKey(emojiInput) {
+  const customEmojiMatch = String(emojiInput).match(/^<a?:\w+:(\d+)>$/);
+  return customEmojiMatch ? customEmojiMatch[1] : emojiInput;
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
@@ -486,6 +491,131 @@ module.exports = {
         }
 
         return;
+      }
+
+      if (interaction.customId.startsWith('reactionRoleModal|')) {
+        const [, draftId] = interaction.customId.split('|');
+
+        const drafts = interaction.client.reactionRoleDrafts;
+        const draft = drafts?.get(draftId);
+
+        if (!draft) {
+          return interaction.reply({
+            content: '❌ This reaction role draft expired or could not be found.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        if (interaction.user.id !== draft.userId) {
+          return interaction.reply({
+            content: '❌ This reaction role modal is only for the original user.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        try {
+          const channel = await interaction.client.channels.fetch(draft.channelId).catch(() => null);
+
+          if (!channel || !channel.isTextBased()) {
+            drafts.delete(draftId);
+
+            return interaction.reply({
+              content: '❌ I could not access that target channel anymore.',
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+
+          const message = interaction.fields.getTextInputValue('reactionRoleMessage');
+
+          const embed = new EmbedBuilder()
+            .setTitle(draft.title)
+            .setDescription(
+              `${message}\n\n${draft.roleEmojiPairs
+                .map(pair => `${pair.emoji} : **${pair.roleName}**`)
+                .join('\n')}`
+            )
+            .setColor(Colors.Blue)
+            .setTimestamp();
+
+          const reactionMessage = await channel.send({ embeds: [embed] });
+
+          for (const pair of draft.roleEmojiPairs) {
+            await reactionMessage.react(pair.emoji);
+          }
+
+          interaction.client.reactionRoles ||= new Map();
+          interaction.client.reactionRoles.set(
+            reactionMessage.id,
+            Object.fromEntries(
+              draft.roleEmojiPairs.map(pair => [
+                getEmojiKey(pair.emoji),
+                pair.roleId,
+              ])
+            )
+          );
+
+          drafts.delete(draftId);
+
+          await sendLog(interaction.client, {
+            title: '✅ Reaction Role Posted',
+            color: 0x57F287,
+            description: 'A reaction role message was posted successfully.',
+            fields: [
+              {
+                name: 'User',
+                value: `${interaction.user.tag} (${interaction.user.id})`,
+                inline: false,
+              },
+              {
+                name: 'Channel ID',
+                value: draft.channelId,
+                inline: false,
+              },
+              {
+                name: 'Message ID',
+                value: reactionMessage.id,
+                inline: false,
+              },
+            ],
+          });
+
+          return interaction.reply({
+            content: `✅ Multi-reaction role message created successfully in <#${draft.channelId}>.`,
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (err) {
+          console.error('reactionRoleModal handling error:', err);
+
+          interaction.client.reactionRoleDrafts?.delete(draftId);
+
+          await sendLog(interaction.client, {
+            title: '❌ Reaction Role Modal Error',
+            color: 0xED4245,
+            description: 'Error while handling reactionRoleModal submission.',
+            fields: [
+              {
+                name: 'User',
+                value: `${interaction.user.tag} (${interaction.user.id})`,
+                inline: false,
+              },
+              {
+                name: 'Custom ID',
+                value: interaction.customId,
+                inline: false,
+              },
+              {
+                name: 'Error',
+                value: `\`\`\`${err?.stack || err}\`\`\``,
+                inline: false,
+              },
+            ],
+          });
+
+          return interaction.reply({
+            content: '❌ Failed to create reaction role message.',
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => null);
+        }
       }
 
       if (interaction.customId.startsWith('bookReviewModal|')) {
