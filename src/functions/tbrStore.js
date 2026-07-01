@@ -882,6 +882,66 @@ async function getGuildLeaderboard(guildId, { period = 'all', limit = 10 } = {})
   }));
 }
 
+async function getMonthlyDigestData(guildId, { year, month }) {
+  const collection = await getTbrCollection();
+
+  const startIso = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+  const endIso = new Date(
+    Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1)
+  ).toISOString();
+
+  const finishedPublic = await collection
+    .find({
+      guildId,
+      state: 'finished',
+      visibility: 'public',
+      finishedAt: { $gte: startIso, $lt: endIso },
+    })
+    .toArray();
+
+  const leaderboardMap = new Map();
+  for (const entry of finishedPublic) {
+    const current = leaderboardMap.get(entry.userId) || {
+      userId: entry.userId,
+      username: entry.username,
+      count: 0,
+    };
+    current.count += 1;
+    leaderboardMap.set(entry.userId, current);
+  }
+
+  const leaderboard = [...leaderboardMap.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const withReviews = finishedPublic.filter(
+    entry => entry.reviewText && entry.reviewText.trim()
+  );
+  const spotlight = withReviews.length
+    ? withReviews[Math.floor(Math.random() * withReviews.length)]
+    : null;
+
+  const activeEntries = await collection
+    .find({
+      guildId,
+      $or: [
+        { addedAt: { $gte: startIso, $lt: endIso } },
+        { startedAt: { $gte: startIso, $lt: endIso } },
+        { finishedAt: { $gte: startIso, $lt: endIso } },
+      ],
+    })
+    .toArray();
+
+  const activeReaderCount = new Set(activeEntries.map(entry => entry.userId)).size;
+
+  return {
+    totalFinishedPublic: finishedPublic.length,
+    leaderboard,
+    spotlight,
+    activeReaderCount,
+  };
+}
+
 async function getReaderStatsData(guildId, userId, { includePrivate = false } = {}) {
   const [currentReads, tbrEntries, finishedEntries] = await Promise.all([
     getUserReadingEntries(guildId, userId, { includePrivate }),
@@ -928,6 +988,7 @@ module.exports = {
   getReaderStatsData,
   getGuildLeaderboard,
   autocompleteUserEntryTitles,
+  getMonthlyDigestData,
   findExistingExactEntry,
   getUserEntryById,
   markReadingEntryFinishedNowById,

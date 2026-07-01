@@ -12,7 +12,7 @@ const CATEGORIES = [
   },
   {
     name: '🛠️ Admin Tools',
-    commands: ['announce', 'dailyquote', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
+    commands: ['announce', 'dailyquote', 'digest', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
   },
 ];
 
