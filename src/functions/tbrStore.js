@@ -815,6 +815,73 @@ async function logFinishedBook({
   });
 }
 
+async function autocompleteUserEntryTitles(guildId, userId, query, { states = null } = {}) {
+  const collection = await getTbrCollection();
+
+  const filterQuery = { guildId, userId };
+  if (states) {
+    filterQuery.state = { $in: states };
+  }
+
+  const entries = await collection.find(filterQuery).toArray();
+  const normalizedQuery = normalizeText(query);
+
+  const filtered = normalizedQuery
+    ? entries.filter(entry => normalizeText(entry.book?.title).includes(normalizedQuery))
+    : entries;
+
+  return filtered.slice(0, 25).map(entry => {
+    const title = entry.book?.title || 'Unknown Title';
+    const author = entry.book?.authors?.[0] || 'Unknown Author';
+
+    return {
+      name: `${title} — ${author}`.slice(0, 100),
+      value: title.slice(0, 100),
+    };
+  });
+}
+
+async function getGuildLeaderboard(guildId, { period = 'all', limit = 10 } = {}) {
+  const collection = await getTbrCollection();
+
+  const match = {
+    guildId,
+    state: 'finished',
+    visibility: 'public',
+  };
+
+  const now = new Date();
+
+  if (period === 'month') {
+    match.finishedAt = {
+      $gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString(),
+    };
+  } else if (period === 'year') {
+    match.finishedAt = {
+      $gte: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)).toISOString(),
+    };
+  }
+
+  const results = await collection.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: '$userId',
+        username: { $last: '$username' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+    { $limit: limit },
+  ]).toArray();
+
+  return results.map(row => ({
+    userId: row._id,
+    username: row.username,
+    count: row.count,
+  }));
+}
+
 async function getReaderStatsData(guildId, userId, { includePrivate = false } = {}) {
   const [currentReads, tbrEntries, finishedEntries] = await Promise.all([
     getUserReadingEntries(guildId, userId, { includePrivate }),
@@ -859,6 +926,8 @@ module.exports = {
   returnReadingEntryToTbr,
   getUserFinishedEntries,
   getReaderStatsData,
+  getGuildLeaderboard,
+  autocompleteUserEntryTitles,
   findExistingExactEntry,
   getUserEntryById,
   markReadingEntryFinishedNowById,

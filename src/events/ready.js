@@ -3,6 +3,7 @@ const { Events, ActivityType } = require('discord.js');
 const pickPresence = require('../functions/pickPresence');
 const { startDailyQuoteScheduler } = require('../functions/dailyQuoteScheduler');
 const { startVcChatRefreshScheduler } = require('../functions/vcChatRefreshScheduler');
+const { startScheduledMessageScheduler } = require('../functions/scheduledMessageScheduler');
 const { sendLog } = require('../functions/discordLogger');
 const { connectToMongo } = require('../functions/mongo');
 
@@ -50,6 +51,19 @@ module.exports = {
 
       await sendLog(client, {
         title: '❌ VC Chat Refresh Scheduler Error',
+        color: 0xED4245,
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+      });
+    }
+
+    try {
+      await startScheduledMessageScheduler(client);
+      console.log('✅ Scheduled message scheduler started.');
+    } catch (error) {
+      console.error('❌ Failed to start scheduled message scheduler:', error);
+
+      await sendLog(client, {
+        title: '❌ Scheduled Message Scheduler Error',
         color: 0xED4245,
         description: `\`\`\`${error?.stack || error}\`\`\``,
       });

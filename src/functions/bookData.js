@@ -137,7 +137,30 @@ async function getBestBookMatch(query) {
   return results[0] || null;
 }
 
+async function searchBooksForAutocomplete(query) {
+  if (!query || !query.trim()) return [];
+
+  try {
+    const results = await searchBooks(query, 6);
+
+    return results.map(book => {
+      const author = book.authors?.[0] || 'Unknown Author';
+      const year =
+        book.publishedYear && book.publishedYear !== 'Unknown' ? ` (${book.publishedYear})` : '';
+
+      return {
+        name: `${book.title} — ${author}${year}`.slice(0, 100),
+        value: `${book.title} ${author}`.trim().slice(0, 100),
+      };
+    });
+  } catch (error) {
+    console.error('Autocomplete book search failed:', error);
+    return [];
+  }
+}
+
 module.exports = {
   searchBooks,
   getBestBookMatch,
+  searchBooksForAutocomplete,
 };

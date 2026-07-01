@@ -31,7 +31,19 @@ async function getTbrCollection() {
   return database.collection('tbrEntries');
 }
 
+async function getScheduledMessagesCollection() {
+  const database = await connectToMongo();
+  return database.collection('scheduledMessages');
+}
+
+async function getReadingGoalsCollection() {
+  const database = await connectToMongo();
+  return database.collection('readingGoals');
+}
+
 module.exports = {
   connectToMongo,
   getTbrCollection,
+  getScheduledMessagesCollection,
+  getReadingGoalsCollection,
 };

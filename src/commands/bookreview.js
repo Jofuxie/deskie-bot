@@ -69,6 +69,7 @@ module.exports = {
             .setName('query')
             .setDescription('Book title you want to log as finished')
             .setRequired(true)
+            .setAutocomplete(true)
         )
         .addNumberOption(option =>
           option
@@ -110,6 +111,7 @@ module.exports = {
             .setName('query')
             .setDescription('Finished book title to edit')
             .setRequired(true)
+            .setAutocomplete(true)
         )
         .addNumberOption(option =>
           option

@@ -174,6 +174,7 @@ module.exports = {
             .setName('query')
             .setDescription('Book title from your TBR')
             .setRequired(true)
+            .setAutocomplete(true)
         )
     )
     .addSubcommand(subcommand =>
@@ -196,6 +197,7 @@ module.exports = {
             .setName('query')
             .setDescription('Book title from your current reads')
             .setRequired(true)
+            .setAutocomplete(true)
         )
         .addIntegerOption(option =>
           option
@@ -214,6 +216,7 @@ module.exports = {
             .setName('query')
             .setDescription('Book title from your current reads')
             .setRequired(true)
+            .setAutocomplete(true)
         )
     )
     .setDMPermission(false),

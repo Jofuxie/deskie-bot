@@ -12,7 +12,9 @@ const {
 const {
   markReadingEntryFinishedNowById,
   updateFinishedReviewById,
+  autocompleteUserEntryTitles,
 } = require('../functions/tbrStore');
+const { searchBooksForAutocomplete } = require('../functions/bookData');
 const { sendLog } = require('../functions/discordLogger');
 
 function buildRatingDisplay(rating) {
@@ -89,9 +91,67 @@ function getEmojiKey(emojiInput) {
   return customEmojiMatch ? customEmojiMatch[1] : emojiInput;
 }
 
+async function getAutocompleteChoices(interaction) {
+  const focused = interaction.options.getFocused(true);
+  const guildId = interaction.guildId;
+  const userId = interaction.user.id;
+  const subcommand = interaction.options.getSubcommand(false);
+
+  if (interaction.commandName === 'tbr' && focused.name === 'query') {
+    if (subcommand === 'add') {
+      return searchBooksForAutocomplete(focused.value);
+    }
+    if (subcommand === 'remove') {
+      return autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['tbr'] });
+    }
+  }
+
+  if (interaction.commandName === 'reading' && focused.name === 'query') {
+    if (subcommand === 'start') {
+      return autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['tbr'] });
+    }
+    if (subcommand === 'progress' || subcommand === 'remove') {
+      return autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['reading'] });
+    }
+  }
+
+  if (interaction.commandName === 'bookreview' && focused.name === 'query') {
+    if (subcommand === 'complete') {
+      const [ownMatches, bookMatches] = await Promise.all([
+        autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['reading', 'tbr'] }),
+        searchBooksForAutocomplete(focused.value),
+      ]);
+
+      const seen = new Set();
+      return [...ownMatches, ...bookMatches].filter((choice) => {
+        if (seen.has(choice.value)) return false;
+        seen.add(choice.value);
+        return true;
+      });
+    }
+    if (subcommand === 'edit') {
+      return autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['finished'] });
+    }
+  }
+
+  return [];
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    if (interaction.isAutocomplete()) {
+      try {
+        const choices = await getAutocompleteChoices(interaction);
+        await interaction.respond(choices.slice(0, 25));
+      } catch (error) {
+        console.error('Autocomplete error:', error);
+        await interaction.respond([]).catch(() => null);
+      }
+
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
 

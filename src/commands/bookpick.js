@@ -5,9 +5,11 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require('discord.js');
 
 const { getRandomPublicEntry } = require('../functions/tbrStore');
+const { checkCooldown } = require('../functions/cooldown');
 
 function buildButtons(book) {
   const buttons = [];
@@ -42,6 +44,15 @@ module.exports = {
     .setDMPermission(false),
 
   async execute(interaction) {
+    const remaining = checkCooldown('bookpick', interaction.user.id, 5);
+
+    if (remaining > 0) {
+      return interaction.reply({
+        content: `⏳ Please wait ${remaining}s before picking another random book.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
     const entry = await getRandomPublicEntry(interaction.guildId);
 
     if (!entry) {

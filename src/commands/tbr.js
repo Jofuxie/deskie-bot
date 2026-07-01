@@ -161,6 +161,7 @@ module.exports = {
             .setName('query')
             .setDescription('Book title, author, or both')
             .setRequired(true)
+            .setAutocomplete(true)
         )
         .addStringOption(option =>
           option
@@ -193,6 +194,7 @@ module.exports = {
             .setName('query')
             .setDescription('Type the title of the book you want to remove')
             .setRequired(true)
+            .setAutocomplete(true)
         )
     )
     .setDMPermission(false),

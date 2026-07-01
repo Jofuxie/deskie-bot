@@ -48,8 +48,6 @@ module.exports = {
         // Delete everything except pinned messages
         const toDelete = fetched.filter((msg) => !msg.pinned);
 
-        if (toDelete.size === 0) break;
-
         const now = Date.now();
         const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
 

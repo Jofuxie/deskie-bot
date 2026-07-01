@@ -39,14 +39,13 @@ const {
           const fetched = await targetChannel.messages.fetch({ limit: 100 });
           // Filter out pinned + bot
           const toDelete = fetched.filter(m => !m.author.bot && !m.pinned);
-          if (toDelete.size === 0) break;
-  
+
           // 14-day cutoff for bulkDelete
           const now = Date.now();
           const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
           const within14Days = toDelete.filter(m => now - m.createdTimestamp < twoWeeksMs);
           const olderThan14Days = toDelete.filter(m => now - m.createdTimestamp >= twoWeeksMs);
-  
+
           // Bulk delete for < 14 days
           if (within14Days.size > 0) {
             try {
@@ -56,7 +55,7 @@ const {
               console.error('Bulk delete error:', err);
             }
           }
-  
+
           // Single-delete older
           for (const [id, msg] of olderThan14Days) {
             try {
@@ -66,8 +65,8 @@ const {
               console.error('Single delete error:', err);
             }
           }
-  
-          // If fewer than 100 fetched, likely done
+
+          // If fewer than 100 fetched, we've reached the end of the channel's history
           if (fetched.size < 100) break;
         }
       } catch (err) {
