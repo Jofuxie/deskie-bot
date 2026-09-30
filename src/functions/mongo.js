@@ -41,9 +41,15 @@ async function getReadingGoalsCollection() {
   return database.collection('readingGoals');
 }
 
+async function getWelcomedMembersCollection() {
+  const database = await connectToMongo();
+  return database.collection('welcomedMembers');
+}
+
 module.exports = {
   connectToMongo,
   getTbrCollection,
   getScheduledMessagesCollection,
   getReadingGoalsCollection,
+  getWelcomedMembersCollection,
 };
