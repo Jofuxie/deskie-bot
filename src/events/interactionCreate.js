@@ -457,7 +457,7 @@ module.exports = {
 
       if (interaction.customId.startsWith('announceModal|')) {
         try {
-          const [, channelId, everyoneFlag, hereFlag, roleIdsRaw] =
+          const [, channelId, everyoneFlag, hereFlag, styleFlag, roleIdsRaw] =
             interaction.customId.split('|');
 
           const channel = await interaction.client.channels.fetch(channelId);
@@ -478,23 +478,45 @@ module.exports = {
             mentionParts.push(`<@&${roleId}>`);
           }
 
-          const embed = new EmbedBuilder()
-            .setDescription(message)
-            .setColor(Colors.Blue)
-            .setTimestamp();
+          const allowedMentions = {
+            parse: [...(pingEveryone || pingHere ? ['everyone'] : []), 'users'],
+            roles: roleIds,
+          };
 
-          if (title && title.trim()) {
-            embed.setTitle(title.trim());
+          if (styleFlag === 'p') {
+            // Plain text: posts like a normal Deskie message, no embed box.
+            const content = [
+              mentionParts.length ? mentionParts.join(' ') : null,
+              title && title.trim() ? `**${title.trim()}**` : null,
+              message,
+            ]
+              .filter(Boolean)
+              .join('\n');
+
+            if (content.length > 2000) {
+              return interaction.reply({
+                content: `❌ That announcement is ${content.length} characters, but plain-text messages max out at 2000. Shorten it, or use the embed style (up to 4000).`,
+                flags: MessageFlags.Ephemeral,
+              });
+            }
+
+            await channel.send({ content, allowedMentions });
+          } else {
+            const embed = new EmbedBuilder()
+              .setDescription(message)
+              .setColor(Colors.Blue)
+              .setTimestamp();
+
+            if (title && title.trim()) {
+              embed.setTitle(title.trim());
+            }
+
+            await channel.send({
+              content: mentionParts.length ? mentionParts.join(' ') : undefined,
+              embeds: [embed],
+              allowedMentions,
+            });
           }
-
-          await channel.send({
-            content: mentionParts.length ? mentionParts.join(' ') : undefined,
-            embeds: [embed],
-            allowedMentions: {
-              parse: [...(pingEveryone || pingHere ? ['everyone'] : []), 'users'],
-              roles: roleIds,
-            },
-          });
 
           await sendLog(interaction.client, {
             title: '✅ Announcement Posted',

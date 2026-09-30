@@ -50,6 +50,16 @@ const {
           .setDescription('Third role to mention')
           .setRequired(false)
       )
+      .addStringOption(option =>
+        option
+          .setName('style')
+          .setDescription('How the announcement looks (default: embed)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Embed (boxed card)', value: 'embed' },
+            { name: 'Plain text (normal message)', value: 'plain' }
+          )
+      )
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .setDMPermission(false),
   
@@ -65,24 +75,31 @@ const {
       const roleIds = [role1, role2, role3]
         .filter(Boolean)
         .map(role => role.id);
-  
+
+      const isPlain = interaction.options.getString('style') === 'plain';
+
+      // Kept to single characters: custom IDs max out at 100 characters.
       const modal = new ModalBuilder()
         .setCustomId(
-          `announceModal|${channel.id}|${pingEveryone ? '1' : '0'}|${pingHere ? '1' : '0'}|${roleIds.join(',')}`
+          `announceModal|${channel.id}|${pingEveryone ? '1' : '0'}|${pingHere ? '1' : '0'}|${isPlain ? 'p' : 'e'}|${roleIds.join(',')}`
         )
-        .setTitle('Create Announcement');
-  
+        .setTitle(isPlain ? 'Create Announcement (Plain Text)' : 'Create Announcement');
+
+      // Plain messages cap at 2000 characters total (mentions + title + body);
+      // embeds allow a 256-character title and a 4096-character body.
       const titleInput = new TextInputBuilder()
         .setCustomId('announceTitle')
         .setLabel('Announcement title')
         .setStyle(TextInputStyle.Short)
-        .setRequired(false);
-  
+        .setRequired(false)
+        .setMaxLength(isPlain ? 100 : 256);
+
       const messageInput = new TextInputBuilder()
         .setCustomId('announceMessage')
         .setLabel('Announcement message')
         .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
+        .setRequired(true)
+        .setMaxLength(isPlain ? 1800 : 4000);
   
       modal.addComponents(
         new ActionRowBuilder().addComponents(titleInput),
