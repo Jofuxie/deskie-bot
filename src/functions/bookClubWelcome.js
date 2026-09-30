@@ -43,6 +43,7 @@ function buildWelcomeText(mentions) {
     '• `/reading start` & `/reading progress` — track what you’re reading',
     '• `/bookreview complete` — rate and review books you’ve finished',
     '• `/goal set` — set a yearly reading goal',
+    '• `/librarycard` — show off your cozy reading shelf',
     '• `/leaderboard` — see who’s been reading the most',
     '• `/help` — see everything else I can do',
     '',

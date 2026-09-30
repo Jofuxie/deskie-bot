@@ -4,7 +4,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const CATEGORIES = [
   {
     name: '📚 Reading Companion',
-    commands: ['tbr', 'reading', 'bookreview', 'bookpick', 'readerstats', 'leaderboard', 'goal'],
+    commands: ['tbr', 'reading', 'bookreview', 'bookpick', 'librarycard', 'leaderboard', 'goal'],
   },
   {
     name: '🧸 Focus & Utility',

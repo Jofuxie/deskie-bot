@@ -203,8 +203,8 @@ function buildReaderStatsEmbed(targetUser, statsData) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('readerstats')
-    .setDescription('View a cozy reading snapshot for yourself or another user.')
+    .setName('librarycard')
+    .setDescription('View your cozy Library Card, or another reader’s.')
     .addUserOption(option =>
       option
         .setName('user')
@@ -230,13 +230,13 @@ module.exports = {
       });
     } catch (error) {
       await sendLog(interaction.client, {
-        title: '❌ Reader Stats Error',
+        title: '❌ Library Card Error',
         color: 0xED4245,
         description: `\`\`\`${error?.stack || error}\`\`\``,
       });
 
       await interaction.reply({
-        content: '❌ Something went wrong while loading reader stats.',
+        content: '❌ Something went wrong while loading that library card.',
         flags: MessageFlags.Ephemeral,
       }).catch(() => null);
     }
