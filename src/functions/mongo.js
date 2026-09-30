@@ -46,10 +46,16 @@ async function getWelcomedMembersCollection() {
   return database.collection('welcomedMembers');
 }
 
+async function getBookClubWelcomedCollection() {
+  const database = await connectToMongo();
+  return database.collection('bookClubWelcomed');
+}
+
 module.exports = {
   connectToMongo,
   getTbrCollection,
   getScheduledMessagesCollection,
   getReadingGoalsCollection,
   getWelcomedMembersCollection,
+  getBookClubWelcomedCollection,
 };
