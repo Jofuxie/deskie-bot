@@ -1,5 +1,6 @@
 // src/commands/say.js
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { linkChannelNames, describeChannelLinks } = require('../functions/channelLinks');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -20,8 +21,9 @@ module.exports = {
     // This command is restricted to admins by default_member_permissions above.
     const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
     const text = interaction.options.getString('message');
-    // convert typed "\n" into real newlines
-    const finalText = text.replace(/\\n/g, '\n');
+    // convert typed "\n" into real newlines, and "#channel-name" into clickable links
+    const links = linkChannelNames(text.replace(/\\n/g, '\n'), interaction.guild);
+    const finalText = links.text;
 
     // Double-check user permissions (in case command was not properly restricted)
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -40,6 +42,6 @@ module.exports = {
     }
 
     // Optionally, confirm success to the admin (we can edit the ephemeral reply)
-    await interaction.editReply({ content: '✅ Message sent.', ephemeral: true });
+    await interaction.editReply({ content: `✅ Message sent.${describeChannelLinks(links)}`, ephemeral: true });
   }
 };

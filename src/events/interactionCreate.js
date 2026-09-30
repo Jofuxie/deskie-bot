@@ -16,6 +16,7 @@ const {
 } = require('../functions/tbrStore');
 const { searchBooksForAutocomplete } = require('../functions/bookData');
 const { sendLog } = require('../functions/discordLogger');
+const { linkChannelNames, describeChannelLinks } = require('../functions/channelLinks');
 
 function buildRatingDisplay(rating) {
   const numeric = Number(rating) || 0;
@@ -389,10 +390,20 @@ module.exports = {
           const channelId = interaction.customId.split('|')[1];
           const channel = await interaction.client.channels.fetch(channelId);
 
-          const userText = interaction.fields.getTextInputValue('sayModalInput');
+          const links = linkChannelNames(
+            interaction.fields.getTextInputValue('sayModalInput'),
+            interaction.guild
+          );
+
+          if (links.text.length > 2000) {
+            return interaction.reply({
+              content: `❌ That message is ${links.text.length} characters (after turning channel names into links), but Discord allows 2000.`,
+              flags: MessageFlags.Ephemeral,
+            });
+          }
 
           await channel.send({
-            content: userText,
+            content: links.text,
             allowedMentions: {
               parse: ['roles', 'users', 'everyone'],
             },
@@ -417,7 +428,7 @@ module.exports = {
           });
 
           await interaction.reply({
-            content: '✅ Message posted!',
+            content: `✅ Message posted!${describeChannelLinks(links)}`,
             flags: MessageFlags.Ephemeral,
           });
         } catch (err) {
@@ -463,7 +474,11 @@ module.exports = {
           const channel = await interaction.client.channels.fetch(channelId);
 
           const title = interaction.fields.getTextInputValue('announceTitle');
-          const message = interaction.fields.getTextInputValue('announceMessage');
+          const links = linkChannelNames(
+            interaction.fields.getTextInputValue('announceMessage'),
+            interaction.guild
+          );
+          const message = links.text;
 
           const pingEveryone = everyoneFlag === '1';
           const pingHere = hereFlag === '1';
@@ -502,6 +517,13 @@ module.exports = {
 
             await channel.send({ content, allowedMentions });
           } else {
+            if (message.length > 4096) {
+              return interaction.reply({
+                content: `❌ That announcement is ${message.length} characters (after turning channel names into links), but embeds max out at 4096.`,
+                flags: MessageFlags.Ephemeral,
+              });
+            }
+
             const embed = new EmbedBuilder()
               .setDescription(message)
               .setColor(Colors.Blue)
@@ -537,7 +559,7 @@ module.exports = {
           });
 
           await interaction.reply({
-            content: '✅ Announcement posted!',
+            content: `✅ Announcement posted!${describeChannelLinks(links)}`,
             flags: MessageFlags.Ephemeral,
           });
         } catch (err) {
@@ -607,7 +629,11 @@ module.exports = {
             });
           }
 
-          const message = interaction.fields.getTextInputValue('reactionRoleMessage');
+          const links = linkChannelNames(
+            interaction.fields.getTextInputValue('reactionRoleMessage'),
+            interaction.guild
+          );
+          const message = links.text;
 
           const embed = new EmbedBuilder()
             .setTitle(draft.title)
@@ -662,7 +688,7 @@ module.exports = {
           });
 
           return interaction.reply({
-            content: `✅ Multi-reaction role message created successfully in <#${draft.channelId}>.`,
+            content: `✅ Multi-reaction role message created successfully in <#${draft.channelId}>.${describeChannelLinks(links)}`,
             flags: MessageFlags.Ephemeral,
           });
         } catch (err) {
