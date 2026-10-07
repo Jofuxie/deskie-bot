@@ -86,7 +86,7 @@ function buildListEmbed(round, entries) {
         '',
         entries.length
           ? formatRouletteLines(entries, totalTickets)
-          : 'No votes yet. Be the first with `/movie vote`!',
+          : `No votes yet. Be the first with \`/movie vote\` in <#${SINEGANG_CHANNEL_ID}>!`,
       ]
         .filter(line => line !== null)
         .join('\n')
@@ -104,7 +104,7 @@ function buildAnnouncement(round) {
     `⏰ Voting closes <t:${toUnix(round.endsAt)}:F> (<t:${toUnix(round.endsAt)}:R>)`,
     '',
     '**🗳️ How to vote**',
-    '1️⃣ Type `/movie vote` in any channel',
+    `1️⃣ Type \`/movie vote\` here in <#${SINEGANG_CHANNEL_ID}>`,
     '2️⃣ Start typing the movie’s title in the `title` box',
     '3️⃣ Pick the right movie from the list that pops up (check the year!)',
     '4️⃣ Press Enter, and Deskie will post your vote with the movie’s poster 🎬',

@@ -2,11 +2,17 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { isTmdbConfigured, resolveMovie, formatMovieLabel } = require('../functions/tmdb');
 const { getOpenRound, castVote, getRoundVotes, tallyVotes } = require('../functions/movieNightStore');
-const { buildVoteEmbed, buildListEmbed } = require('../functions/movieNight');
+const { SINEGANG_CHANNEL_ID, buildVoteEmbed, buildListEmbed } = require('../functions/movieNight');
 const { checkCooldown } = require('../functions/cooldown');
 const { sendLog } = require('../functions/discordLogger');
 
 const NO_OPEN_ROUND = '🎬 There’s no Movie Night vote open right now. An admin can start one with `/movienight start`.';
+
+// Votes are kept to #sinegang (or a thread inside it) so other channels stay calm.
+function isInSinegang(interaction) {
+  return interaction.channelId === SINEGANG_CHANNEL_ID
+    || interaction.channel?.parentId === SINEGANG_CHANNEL_ID;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,7 +21,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('vote')
-        .setDescription('Vote for a movie (1 vote per person, you can change it anytime).')
+        .setDescription('Vote for a movie in #sinegang (1 vote per person, you can change it anytime).')
         .addStringOption(option =>
           option
             .setName('title')
@@ -42,10 +48,22 @@ module.exports = {
       }
 
       const entries = tallyVotes(await getRoundVotes(round.id));
-      return interaction.reply({ embeds: [buildListEmbed(round, entries)] });
+
+      // Public in #sinegang; private everywhere else so it doesn't clutter other channels.
+      return interaction.reply({
+        embeds: [buildListEmbed(round, entries)],
+        flags: isInSinegang(interaction) ? undefined : MessageFlags.Ephemeral,
+      });
     }
 
     if (subcommand === 'vote') {
+      if (!isInSinegang(interaction)) {
+        return interaction.reply({
+          content: `🎬 Movie Night votes go in <#${SINEGANG_CHANNEL_ID}> so other channels stay cozy and calm. Head over there and use \`/movie vote\` again~`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
       if (!isTmdbConfigured()) {
         return interaction.reply({
           content: '❌ Movie search isn’t set up yet (missing `TMDB_API_KEY`). Please let an admin know!',
