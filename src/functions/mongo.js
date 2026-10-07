@@ -51,6 +51,16 @@ async function getBookClubWelcomedCollection() {
   return database.collection('bookClubWelcomed');
 }
 
+async function getMovieRoundsCollection() {
+  const database = await connectToMongo();
+  return database.collection('movieRounds');
+}
+
+async function getMovieVotesCollection() {
+  const database = await connectToMongo();
+  return database.collection('movieVotes');
+}
+
 module.exports = {
   connectToMongo,
   getTbrCollection,
@@ -58,4 +68,6 @@ module.exports = {
   getReadingGoalsCollection,
   getWelcomedMembersCollection,
   getBookClubWelcomedCollection,
+  getMovieRoundsCollection,
+  getMovieVotesCollection,
 };

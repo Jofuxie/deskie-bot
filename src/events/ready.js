@@ -6,6 +6,7 @@ const { startVcChatRefreshScheduler } = require('../functions/vcChatRefreshSched
 const { startScheduledMessageScheduler } = require('../functions/scheduledMessageScheduler');
 const { startMonthlyDigestScheduler } = require('../functions/monthlyDigestScheduler');
 const { startBookClubWelcomeScheduler } = require('../functions/bookClubWelcome');
+const { startMovieNightScheduler } = require('../functions/movieNight');
 const { sendLog } = require('../functions/discordLogger');
 const { connectToMongo } = require('../functions/mongo');
 
@@ -92,6 +93,19 @@ module.exports = {
 
       await sendLog(client, {
         title: '❌ Book Club Welcome Scheduler Error',
+        color: 0xED4245,
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+      });
+    }
+
+    try {
+      await startMovieNightScheduler(client);
+      console.log('✅ Movie night scheduler started.');
+    } catch (error) {
+      console.error('❌ Failed to start movie night scheduler:', error);
+
+      await sendLog(client, {
+        title: '❌ Movie Night Scheduler Error',
         color: 0xED4245,
         description: `\`\`\`${error?.stack || error}\`\`\``,
       });

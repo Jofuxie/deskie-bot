@@ -17,6 +17,13 @@ const {
 const { searchBooksForAutocomplete } = require('../functions/bookData');
 const { sendLog } = require('../functions/discordLogger');
 const { linkChannelNames, describeChannelLinks } = require('../functions/channelLinks');
+const { searchMoviesForAutocomplete, formatMovieLabel } = require('../functions/tmdb');
+const { getOpenRound, getRoundVotes, tallyVotes } = require('../functions/movieNightStore');
+
+async function getMovieRouletteEntries(guildId) {
+  const round = await getOpenRound(guildId);
+  return round ? tallyVotes(await getRoundVotes(round.id)) : [];
+}
 
 function buildRatingDisplay(rating) {
   const numeric = Number(rating) || 0;
@@ -133,6 +140,27 @@ async function getAutocompleteChoices(interaction) {
     if (subcommand === 'edit') {
       return autocompleteUserEntryTitles(guildId, userId, focused.value, { states: ['finished'] });
     }
+  }
+
+  if (interaction.commandName === 'movie' && subcommand === 'vote' && focused.name === 'title') {
+    const query = focused.value.trim().toLowerCase();
+
+    const [entries, searchResults] = await Promise.all([
+      getMovieRouletteEntries(guildId),
+      searchMoviesForAutocomplete(focused.value),
+    ]);
+
+    // Movies already in the roulette come first, so it's easy to add a ticket to one.
+    const inRoulette = entries
+      .filter((entry) => !query || entry.movie.title.toLowerCase().includes(query))
+      .slice(0, 10)
+      .map((entry) => ({
+        name: `🎟️ ${formatMovieLabel(entry.movie)} · ${entry.tickets} ${entry.tickets === 1 ? 'vote' : 'votes'} so far`.slice(0, 100),
+        value: `tmdb:${entry.tmdbId}`,
+      }));
+
+    const alreadyListed = new Set(inRoulette.map((choice) => choice.value));
+    return [...inRoulette, ...searchResults.filter((choice) => !alreadyListed.has(choice.value))];
   }
 
   return [];

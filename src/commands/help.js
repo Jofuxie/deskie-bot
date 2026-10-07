@@ -7,12 +7,16 @@ const CATEGORIES = [
     commands: ['tbr', 'reading', 'bookreview', 'bookpick', 'librarycard', 'leaderboard', 'goal'],
   },
   {
+    name: '🎬 Movie Night',
+    commands: ['movie'],
+  },
+  {
     name: '🧸 Focus & Utility',
     commands: ['pomodoro', 'remindme', 'help'],
   },
   {
     name: '🛠️ Admin Tools',
-    commands: ['announce', 'bookclubwelcome', 'dailyquote', 'digest', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
+    commands: ['announce', 'bookclubwelcome', 'dailyquote', 'digest', 'movienight', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
   },
 ];
 
