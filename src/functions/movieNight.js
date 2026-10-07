@@ -14,6 +14,7 @@ const {
 const { sendLog } = require('./discordLogger');
 
 const SINEGANG_CHANNEL_ID = '1494002467468349440';
+const BOOK_READER_ROLE_ID = '1485994676812251196'; // pinged when voting opens
 const DELETE_AFTER_DAYS = 2;
 const REMINDER_BEFORE_MS = 24 * 60 * 60 * 1000; // "last call" one day before voting closes
 const MOVIE_COLOR = 0x9B59B6;
@@ -97,15 +98,24 @@ function buildListEmbed(round, entries) {
 
 function buildAnnouncement(round) {
   return [
+    `<@&${BOOK_READER_ROLE_ID}>`,
     '🎬 **Movie Night voting is open!**',
     round.theme ? `✨ **Theme:** ${round.theme}` : null,
-    '',
-    'Vote for the movie you want to watch with `/movie vote`. Just start typing the title and pick it from the list~',
-    '🎟️ **1 vote per person**, and you can change it anytime',
-    '🎡 Every vote is a ticket in the roulette, so movies with more votes have better chances',
     `⏰ Voting closes <t:${toUnix(round.endsAt)}:F> (<t:${toUnix(round.endsAt)}:R>)`,
     '',
-    'See what’s in the running with `/movie list` 🍿',
+    '**🗳️ How to vote**',
+    '1️⃣ Type `/movie vote` in any channel',
+    '2️⃣ Start typing the movie’s title in the `title` box',
+    '3️⃣ Pick the right movie from the list that pops up (check the year!)',
+    '4️⃣ Press Enter, and Deskie will post your vote with the movie’s poster 🎬',
+    '',
+    '**📌 Good to know**',
+    '🎟️ **1 vote per person.** Changed your mind? Just use `/movie vote` again and your vote moves over',
+    '🙋 Want the same movie someone else picked? Movies already in the roulette show up first in the list with a 🎟️',
+    '🎡 Every vote is a ticket in the roulette, so movies with more votes have better chances of being picked',
+    '📋 See what’s in the running anytime with `/movie list`',
+    '',
+    'Happy voting, and see you at movie night! 🍿',
   ]
     .filter(line => line !== null)
     .join('\n');
@@ -123,7 +133,7 @@ async function getSinegangChannel(client) {
 
 async function postAnnouncement(client, round) {
   const channel = await getSinegangChannel(client);
-  await channel.send({ content: buildAnnouncement(round), allowedMentions: { parse: [] } });
+  await channel.send({ content: buildAnnouncement(round), allowedMentions: { roles: [BOOK_READER_ROLE_ID] } });
 }
 
 // Each ticket is equally likely, so a movie with 3 votes has 3x the chance of one with 1.
