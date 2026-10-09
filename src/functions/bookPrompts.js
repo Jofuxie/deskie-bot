@@ -155,9 +155,9 @@ function pickSubheader() {
 
 function buildPromptMessage(text, subheader = pickSubheader()) {
   return [
-    `<@&${BOOK_READER_ROLE_ID}>`,
-    `## 💭 ${text}`,
-    subheader,
+    `Hellooo <@&${BOOK_READER_ROLE_ID}>! Today’s Sagot Gulaman is:`,
+    `## 🧋 ${text}`,
+    `*${subheader}*`,
   ].join('\n');
 }
 
