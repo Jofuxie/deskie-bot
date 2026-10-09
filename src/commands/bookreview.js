@@ -230,9 +230,15 @@ module.exports = {
           });
         }
 
-        await interaction.followUp({
+        // Sent as a normal channel message: after an ephemeral deferReply, Discord turns
+        // the first followUp into that private reply instead of a new public message.
+        const channel = interaction.channel
+          ?? await interaction.client.channels.fetch(interaction.channelId);
+
+        await channel.send({
           content: `${interaction.user} completed and reviewed **${result.entry.book.title}**.`,
           embeds: [embed],
+          allowedMentions: { parse: [] },
         });
 
         return interaction.editReply({
