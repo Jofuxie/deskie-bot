@@ -10,6 +10,26 @@ const { startMovieNightScheduler } = require('../functions/movieNight');
 const { sendLog } = require('../functions/discordLogger');
 const { connectToMongo } = require('../functions/mongo');
 
+// Reports which settings Deskie can see at startup (names only, never values),
+// so a missing variable on the host shows up in the log channel.
+const EXPECTED_ENV = [
+  { name: 'MONGODB_URI', purpose: 'database' },
+  { name: 'LOG_CHANNEL_ID', purpose: 'log channel' },
+  { name: 'DAILY_QUOTE_CHANNEL_ID', purpose: 'daily quote' },
+  { name: 'API_NINJAS_KEY', purpose: 'daily quote' },
+  { name: 'TMDB_API_KEY', purpose: 'movie night' },
+  { name: 'MONTHLY_DIGEST_CHANNEL_ID', purpose: 'monthly digest', optional: true },
+];
+
+function describeEnvironment() {
+  return EXPECTED_ENV.map(({ name, purpose, optional }) => {
+    if (process.env[name]?.trim()) return `✅ \`${name}\``;
+    return optional
+      ? `➖ \`${name}\` (optional, ${purpose})`
+      : `❌ \`${name}\` missing, ${purpose} won't work`;
+  }).join('\n');
+}
+
 module.exports = {
   name: Events.ClientReady,
   once: true,
@@ -115,6 +135,13 @@ module.exports = {
       title: '✅ Deskie Started',
       color: 0x57F287,
       description: `Deskie is online as \`${client.user.tag}\``,
+      fields: [
+        {
+          name: 'Settings Check',
+          value: describeEnvironment(),
+          inline: false,
+        },
+      ],
     });
 
     const myGuildId = '1355931319384801361';
