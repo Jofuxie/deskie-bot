@@ -7,6 +7,7 @@ const { startScheduledMessageScheduler } = require('../functions/scheduledMessag
 const { startMonthlyDigestScheduler } = require('../functions/monthlyDigestScheduler');
 const { startBookClubWelcomeScheduler } = require('../functions/bookClubWelcome');
 const { startMovieNightScheduler } = require('../functions/movieNight');
+const { startBookPromptScheduler } = require('../functions/bookPrompts');
 const { sendLog } = require('../functions/discordLogger');
 const { connectToMongo } = require('../functions/mongo');
 
@@ -126,6 +127,19 @@ module.exports = {
 
       await sendLog(client, {
         title: '❌ Movie Night Scheduler Error',
+        color: 0xED4245,
+        description: `\`\`\`${error?.stack || error}\`\`\``,
+      });
+    }
+
+    try {
+      startBookPromptScheduler(client);
+      console.log('✅ Bookish Banter question scheduler started.');
+    } catch (error) {
+      console.error('❌ Failed to start Bookish Banter question scheduler:', error);
+
+      await sendLog(client, {
+        title: '❌ Bookish Banter Scheduler Error',
         color: 0xED4245,
         description: `\`\`\`${error?.stack || error}\`\`\``,
       });

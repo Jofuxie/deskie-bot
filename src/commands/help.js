@@ -16,7 +16,7 @@ const CATEGORIES = [
   },
   {
     name: '🛠️ Admin Tools',
-    commands: ['announce', 'bookclubwelcome', 'dailyquote', 'digest', 'movienight', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
+    commands: ['announce', 'bookclubwelcome', 'dailyquote', 'digest', 'movienight', 'prompt', 'reactionrole', 'refreshvcchat', 'say', 'saymodal', 'wipechannel'],
   },
 ];
 

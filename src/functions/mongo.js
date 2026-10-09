@@ -61,8 +61,14 @@ async function getMovieVotesCollection() {
   return database.collection('movieVotes');
 }
 
+async function getCustomBookPromptsCollection() {
+  const database = await connectToMongo();
+  return database.collection('customBookPrompts');
+}
+
 module.exports = {
   connectToMongo,
+  getCustomBookPromptsCollection,
   getTbrCollection,
   getScheduledMessagesCollection,
   getReadingGoalsCollection,
