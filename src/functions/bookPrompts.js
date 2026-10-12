@@ -9,11 +9,11 @@ const BOOKISH_BANTER_CHANNEL_ID = '1486006574060409032';
 const BOOK_READER_ROLE_ID = '1485994676812251196';
 const PROMPT_ADMIN_ROLE_ID = '1555544474220757115';
 
-// Mondays, Wednesdays and Fridays at 9:00 AM Asia/Manila.
+// Mondays, Wednesdays and Fridays at 7:00 PM Asia/Manila.
 const SCHEDULE_DAYS = [1, 3, 5]; // 0 = Sunday ... 6 = Saturday
-const SCHEDULE_HOUR = 9;
+const SCHEDULE_HOUR = 19;
 const SCHEDULE_MINUTE = 0;
-const CATCH_UP_END_HOUR = 12; // if Deskie was offline at 9 AM, catch up until noon
+const CATCH_UP_END_HOUR = 22; // if Deskie was offline at 7 PM, catch up until 10 PM
 const LOW_POOL_WARNING = 10;
 
 const SUBHEADERS = [
@@ -297,7 +297,7 @@ function startBookPromptScheduler(client) {
     }
   );
 
-  console.log('[Book Prompts] Scheduler started for Mon/Wed/Fri 9:00 AM Asia/Manila.');
+  console.log('[Book Prompts] Scheduler started for Mon/Wed/Fri 7:00 PM Asia/Manila.');
 
   catchUpMissedPrompt(client).catch(async error => {
     console.error('[Book Prompts] Startup catch-up failed:', error);

@@ -90,7 +90,7 @@ module.exports = {
 
         return interaction.editReply({
           content: `✅ Posted in <#${BOOKISH_BANTER_CHANNEL_ID}>: **${result.prompt.text}**\n` +
-            `This counts as today’s question, so the 9 AM post won’t repeat it today. ${result.remaining} question(s) left.`,
+            `This counts as today’s question, so the 7 PM post won’t repeat it today. ${result.remaining} question(s) left.`,
         });
       }
 
