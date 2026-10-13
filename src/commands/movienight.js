@@ -5,16 +5,25 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { isTmdbConfigured, formatMovieLabel } = require('../functions/tmdb');
-const { getOpenRound, createRound } = require('../functions/movieNightStore');
+const { getOpenRound, createRound, extendRound } = require('../functions/movieNightStore');
 const {
   SINEGANG_CHANNEL_ID,
   DELETE_AFTER_DAYS,
   postAnnouncement,
+  postExtensionNotice,
   finishRound,
   cancelRound,
   scheduleRoundTimers,
 } = require('../functions/movieNight');
 const { sendLog } = require('../functions/discordLogger');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Voting deadlines run on a setTimeout, which can't wait much past ~24.8 days.
+const MAX_DAYS_LEFT = 21;
+
+function toUnix(date) {
+  return Math.floor(new Date(date).getTime() / 1000);
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -36,6 +45,19 @@ module.exports = {
             .setName('theme')
             .setDescription('Optional theme, e.g. "Spooky October 🎃"')
             .setMaxLength(100)
+        )
+    )
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('extend')
+        .setDescription('Give everyone more days to vote.')
+        .addIntegerOption(option =>
+          option
+            .setName('days')
+            .setDescription('How many extra days to add')
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(7)
         )
     )
     .addSubcommand(subcommand =>
@@ -97,6 +119,36 @@ module.exports = {
 
       if (!openRound) {
         return interaction.editReply({ content: 'ℹ️ There’s no Movie Night vote open right now.' });
+      }
+
+      if (subcommand === 'extend') {
+        const days = interaction.options.getInteger('days', true);
+        const newEndsAt = new Date(new Date(openRound.endsAt).getTime() + days * DAY_MS);
+
+        if (newEndsAt.getTime() - Date.now() > MAX_DAYS_LEFT * DAY_MS) {
+          return interaction.editReply({
+            content: `⚠️ That would leave more than ${MAX_DAYS_LEFT} days of voting. Voting currently closes <t:${toUnix(openRound.endsAt)}:R>, so try fewer days.`,
+          });
+        }
+
+        const round = await extendRound(openRound.id, newEndsAt);
+
+        if (!round) {
+          return interaction.editReply({ content: 'ℹ️ That vote just closed, so it can’t be extended.' });
+        }
+
+        scheduleRoundTimers(interaction.client, round);
+        await postExtensionNotice(interaction.client, round, days);
+
+        await sendLog(interaction.client, {
+          title: '⏳ Movie Night Extended',
+          color: 0x9B59B6,
+          description: `${interaction.user.tag} extended voting by ${days} day(s). It now closes <t:${toUnix(round.endsAt)}:F>.`,
+        });
+
+        return interaction.editReply({
+          content: `✅ Voting extended by **${days}** day(s). It now closes <t:${toUnix(round.endsAt)}:F> (<t:${toUnix(round.endsAt)}:R>), announced in <#${SINEGANG_CHANNEL_ID}>.`,
+        });
       }
 
       if (subcommand === 'end') {

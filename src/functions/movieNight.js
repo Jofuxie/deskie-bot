@@ -136,6 +136,23 @@ async function postAnnouncement(client, round) {
   await channel.send({ content: buildAnnouncement(round), allowedMentions: { roles: [BOOK_READER_ROLE_ID] } });
 }
 
+async function postExtensionNotice(client, round, days) {
+  const channel = await getSinegangChannel(client);
+
+  await channel.send({
+    content: [
+      `⏳ **Movie Night voting has been extended by ${days} ${days === 1 ? 'day' : 'days'}!**`,
+      round.theme ? `✨ **Theme:** ${round.theme}` : null,
+      `⏰ Voting now closes <t:${toUnix(round.endsAt)}:F> (<t:${toUnix(round.endsAt)}:R>)`,
+      '',
+      'Haven’t voted yet? There’s still time with `/movie vote` 🍿',
+    ]
+      .filter(line => line !== null)
+      .join('\n'),
+    allowedMentions: { parse: [] },
+  });
+}
+
 // Each ticket is equally likely, so a movie with 3 votes has 3x the chance of one with 1.
 function pickWeightedWinner(entries) {
   const totalTickets = entries.reduce((sum, entry) => sum + entry.tickets, 0);
@@ -352,6 +369,7 @@ module.exports = {
   buildVoteEmbed,
   buildListEmbed,
   postAnnouncement,
+  postExtensionNotice,
   pickWeightedWinner,
   finishRound,
   cancelRound,

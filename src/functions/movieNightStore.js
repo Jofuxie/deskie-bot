@@ -114,6 +114,18 @@ async function closeRound(roundId, fields) {
   );
 }
 
+// Moves an open round's deadline. Also re-arms the "last call" reminder so a
+// new one goes out a day before the new deadline. Returns null if not open.
+async function extendRound(roundId, endsAt) {
+  const rounds = await getMovieRoundsCollection();
+
+  return rounds.findOneAndUpdate(
+    { id: roundId, status: 'open' },
+    { $set: { endsAt, reminderSent: false } },
+    { returnDocument: 'after' }
+  );
+}
+
 // Claims the "last call" reminder exactly once. Returns null if already sent.
 async function claimReminder(roundId) {
   const rounds = await getMovieRoundsCollection();
@@ -158,6 +170,7 @@ module.exports = {
   getRoundVotes,
   tallyVotes,
   closeRound,
+  extendRound,
   claimReminder,
   scheduleRoundDeletion,
   deleteRoundData,
