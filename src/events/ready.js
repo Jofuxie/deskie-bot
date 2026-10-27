@@ -1,4 +1,5 @@
 // src/events/ready.js
+const os = require('os');
 const { Events, ActivityType } = require('discord.js');
 const pickPresence = require('../functions/pickPresence');
 const { startDailyQuoteScheduler } = require('../functions/dailyQuoteScheduler');
@@ -162,7 +163,8 @@ module.exports = {
     await sendLog(client, {
       title: '✅ Deskie Started',
       color: 0x57F287,
-      description: `Deskie is online as \`${client.user.tag}\``,
+      // The machine name makes it easy to spot a second copy running elsewhere.
+      description: `Deskie is online as \`${client.user.tag}\`\nRunning on: \`${os.hostname()}\``,
       fields: [
         {
           name: 'Settings Check',
