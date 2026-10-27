@@ -6,13 +6,15 @@ const path = require('path');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const { sendLog } = require('./functions/discordLogger');
 
-// Initialize client with necessary intents for guilds, messages, reactions, and members
+// Initialize client with necessary intents for guilds, messages, reactions, members, and voice
+// (GuildVoiceStates lets Deskie see who joins/leaves voice channels for reading sessions)
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildVoiceStates
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });

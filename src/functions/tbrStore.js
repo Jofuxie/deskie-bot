@@ -1,4 +1,31 @@
-const { getTbrCollection } = require('./mongo');
+const { getTbrCollection, getReadingProgressLogCollection } = require('./mongo');
+
+// Pages-read records only need to cover the current year's stats, so each one
+// expires after ~13 months (MongoDB deletes it automatically via a TTL index).
+const PROGRESS_LOG_KEEP_DAYS = 400;
+
+// Records pages read since the last update, for "pages turned" stats.
+// Never blocks the reading flow: a logging failure is only printed.
+async function logPagesRead({ guildId, userId, entryId, fromPage, toPage }) {
+  const pages = (Number(toPage) || 0) - (Number(fromPage) || 0);
+  if (pages <= 0) return;
+
+  try {
+    const collection = await getReadingProgressLogCollection();
+    const at = new Date();
+
+    await collection.insertOne({
+      guildId,
+      userId,
+      entryId,
+      pages,
+      at,
+      expireAt: new Date(at.getTime() + PROGRESS_LOG_KEEP_DAYS * 24 * 60 * 60 * 1000),
+    });
+  } catch (error) {
+    console.error('Failed to log pages read:', error);
+  }
+}
 
 function makeEntryId() {
   return `tbr_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -405,6 +432,14 @@ async function updateReadingProgress(guildId, userId, query, page) {
     return { status: 'not_found' };
   }
 
+  await logPagesRead({
+    guildId,
+    userId,
+    entryId: target.id,
+    fromPage: target.currentPage,
+    toPage: numericPage,
+  });
+
   return {
     status: 'updated',
     entry: result,
@@ -456,6 +491,14 @@ async function markReadingEntryFinishedNowById(guildId, userId, entryId) {
   if (!result) {
     return { status: 'not_found' };
   }
+
+  await logPagesRead({
+    guildId,
+    userId,
+    entryId,
+    fromPage: existing.currentPage,
+    toPage: totalPages,
+  });
 
   return {
     status: 'finished_now',
@@ -582,6 +625,18 @@ async function finalizeEntryToFinished(entry, rating, finishedDateInput = null, 
 
   if (!result) {
     return { status: 'not_found' };
+  }
+
+  // Only a book that was being read counts as pages turned now; a TBR book
+  // logged as finished was read at some earlier, unknown time.
+  if (entry.state === 'reading') {
+    await logPagesRead({
+      guildId: entry.guildId,
+      userId: entry.userId,
+      entryId: entry.id,
+      fromPage: entry.currentPage,
+      toPage: totalPages,
+    });
   }
 
   return {

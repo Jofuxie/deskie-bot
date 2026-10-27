@@ -66,9 +66,21 @@ async function getCustomBookPromptsCollection() {
   return database.collection('customBookPrompts');
 }
 
+async function getReadingProgressLogCollection() {
+  const database = await connectToMongo();
+  return database.collection('readingProgressLog');
+}
+
+async function getReadingSessionsCollection() {
+  const database = await connectToMongo();
+  return database.collection('readingSessions');
+}
+
 module.exports = {
   connectToMongo,
   getCustomBookPromptsCollection,
+  getReadingProgressLogCollection,
+  getReadingSessionsCollection,
   getTbrCollection,
   getScheduledMessagesCollection,
   getReadingGoalsCollection,
