@@ -20,6 +20,30 @@ function getPeriodStarts(now = new Date()) {
   };
 }
 
+// Start and end of a given calendar month in Manila time (monthIndex is 0-11).
+function getMonthRange(year, monthIndex) {
+  return {
+    start: new Date(Date.UTC(year, monthIndex, 1) - MANILA_OFFSET_MS),
+    end: new Date(Date.UTC(year, monthIndex + 1, 1) - MANILA_OFFSET_MS),
+    label: new Date(Date.UTC(year, monthIndex, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+  };
+}
+
+// Public books finished in a given month, oldest first. Private books are never shown.
+async function getFinishedInMonth(guildId, year, monthIndex) {
+  const { start, end } = getMonthRange(year, monthIndex);
+  const tbr = await getTbrCollection();
+  return tbr
+    .find({
+      guildId,
+      state: 'finished',
+      visibility: 'public',
+      finishedAt: { $gte: start.toISOString(), $lt: end.toISOString() },
+    })
+    .sort({ finishedAt: 1 })
+    .toArray();
+}
+
 // Finished books (private ones included in the numbers only).
 async function getFinishedTotals(guildId, since) {
   const tbr = await getTbrCollection();
@@ -153,6 +177,8 @@ async function buildStatsEmbed(guildId) {
 
 module.exports = {
   getPeriodStarts,
+  getMonthRange,
+  getFinishedInMonth,
   getPeriodStats,
   getRecentReviews,
   buildStatsEmbed,
