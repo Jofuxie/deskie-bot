@@ -169,6 +169,12 @@ module.exports = {
           value: describeEnvironment(),
           inline: false,
         },
+        {
+          // Lets you confirm the host is running the latest code after an update.
+          name: `Commands Loaded (${client.commands.size})`,
+          value: [...client.commands.keys()].sort().map(name => `\`/${name}\``).join(' ').slice(0, 1024) || 'None',
+          inline: false,
+        },
       ],
     });
 

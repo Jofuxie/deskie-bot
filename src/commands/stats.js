@@ -4,12 +4,10 @@ const { isAdmin } = require('../functions/adminCheck');
 const { buildStatsEmbed } = require('../functions/readingStats');
 const { sendLog } = require('../functions/discordLogger');
 
-const DMS_CLOSED = 50007; // Discord error: "Cannot send messages to this user"
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('stats')
-    .setDescription('Get Café Cloud’s reading stats for this month and year in your DMs (admin only).')
+    .setDescription('See Café Cloud’s reading stats for this month and year, privately (admin only).')
     .setDMPermission(false),
 
   async execute(interaction) {
@@ -24,19 +22,7 @@ module.exports = {
 
     try {
       const embed = await buildStatsEmbed(interaction.guildId);
-
-      try {
-        await interaction.user.send({ embeds: [embed] });
-        return interaction.editReply({ content: '📬 Sent the reading stats to your DMs!' });
-      } catch (error) {
-        if (error?.code !== DMS_CLOSED) throw error;
-
-        // DMs are closed: show the stats privately here instead.
-        return interaction.editReply({
-          content: '📭 I couldn’t DM you (your DMs from server members may be off), so here they are privately instead:',
-          embeds: [embed],
-        });
-      }
+      return interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error('stats command error:', error);
 
