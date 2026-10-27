@@ -110,7 +110,8 @@ module.exports = {
       await interaction.reply({ embeds: [pages[0]], allowedMentions: { parse: [] } });
       const message = await interaction.fetchReply();
 
-      await startReactionPager(message, pages, { userId: interaction.user.id });
+      // Anyone in the channel can flip the pages.
+      await startReactionPager(message, pages);
     } catch (error) {
       console.error('reviews command error:', error);
 

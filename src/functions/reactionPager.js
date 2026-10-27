@@ -5,10 +5,11 @@ const PREVIOUS = '⬅️';
 const NEXT = '➡️';
 const IDLE_MS = 3 * 60 * 1000; // stop listening after 3 minutes without a flip
 
-// Lets one person flip through embed pages by reacting ⬅️ / ➡️ on a message.
+// Lets people flip through embed pages by reacting ⬅️ / ➡️ on a message.
+// Pass userId to limit flipping to one person; otherwise anyone (not bots) can.
 // If Deskie can't remove reactions (no Manage Messages), un-reacting also
 // flips the page, so the person never has to wait or switch emojis.
-async function startReactionPager(message, pages, { userId }) {
+async function startReactionPager(message, pages, { userId } = {}) {
   if (pages.length <= 1) return;
 
   const me = message.guild?.members.me;
@@ -25,7 +26,8 @@ async function startReactionPager(message, pages, { userId }) {
   let page = 0;
 
   const collector = message.createReactionCollector({
-    filter: (reaction, user) => user.id === userId && [PREVIOUS, NEXT].includes(reaction.emoji.name),
+    filter: (reaction, user) =>
+      !user.bot && (!userId || user.id === userId) && [PREVIOUS, NEXT].includes(reaction.emoji.name),
     idle: IDLE_MS,
     dispose: !canManage,
   });
