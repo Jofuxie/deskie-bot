@@ -44,11 +44,27 @@ async function getFinishedInMonth(guildId, year, monthIndex) {
     .toArray();
 }
 
+// Start and end of a calendar year in Manila time.
+function getYearRange(year) {
+  return {
+    start: new Date(Date.UTC(year, 0, 1) - MANILA_OFFSET_MS),
+    end: new Date(Date.UTC(year + 1, 0, 1) - MANILA_OFFSET_MS),
+    label: String(year),
+  };
+}
+
+// Builds a Mongo range filter; `until` is optional (open-ended up to now).
+function dateRange(since, until, toValue = date => date) {
+  return until ? { $gte: toValue(since), $lt: toValue(until) } : { $gte: toValue(since) };
+}
+
+const toIso = date => date.toISOString();
+
 // Finished books (private ones included in the numbers only).
-async function getFinishedTotals(guildId, since) {
+async function getFinishedTotals(guildId, since, until = null) {
   const tbr = await getTbrCollection();
   const finished = await tbr
-    .find({ guildId, state: 'finished', finishedAt: { $gte: since.toISOString() } })
+    .find({ guildId, state: 'finished', finishedAt: dateRange(since, until, toIso) })
     .toArray();
 
   // Unrated books have rating: null, which Number() would turn into a 0-star rating.
@@ -68,11 +84,11 @@ async function getFinishedTotals(guildId, since) {
   };
 }
 
-async function getPagesTurned(guildId, since) {
+async function getPagesTurned(guildId, since, until = null) {
   const log = await getReadingProgressLogCollection();
   const [result] = await log
     .aggregate([
-      { $match: { guildId, at: { $gte: since } } },
+      { $match: { guildId, at: dateRange(since, until) } },
       { $group: { _id: null, pages: { $sum: '$pages' } } },
     ])
     .toArray();
@@ -80,21 +96,27 @@ async function getPagesTurned(guildId, since) {
   return result?.pages || 0;
 }
 
-async function getPeriodStats(guildId, since) {
+async function getPeriodStats(guildId, since, until = null) {
   const [finished, pagesTurned, sessions] = await Promise.all([
-    getFinishedTotals(guildId, since),
-    getPagesTurned(guildId, since),
-    getSessionTotals(guildId, since),
+    getFinishedTotals(guildId, since, until),
+    getPagesTurned(guildId, since, until),
+    getSessionTotals(guildId, since, until),
   ]);
 
   return { ...finished, pagesTurned, ...sessions };
 }
 
-// Most recent public ratings/reviews. Private books are never shown.
-async function getRecentReviews(guildId, limit = RECENT_REVIEW_COUNT) {
+// Most recent public ratings/reviews within a period. Private books are never shown.
+async function getRecentReviews(guildId, { since, until = null }, limit = RECENT_REVIEW_COUNT) {
   const tbr = await getTbrCollection();
   return tbr
-    .find({ guildId, state: 'finished', visibility: 'public', rating: { $ne: null } })
+    .find({
+      guildId,
+      state: 'finished',
+      visibility: 'public',
+      rating: { $ne: null },
+      finishedAt: dateRange(since, until, toIso),
+    })
     .sort({ finishedAt: -1 })
     .limit(limit)
     .toArray();
@@ -148,15 +170,68 @@ function formatReviews(entries) {
   return truncate(text, 1024);
 }
 
-async function buildStatsEmbed(guildId) {
-  const { monthStart, yearStart, monthLabel, yearLabel } = getPeriodStarts();
+function getCurrentManilaMonth(now = new Date()) {
+  const manila = new Date(now.getTime() + MANILA_OFFSET_MS);
+  return { year: manila.getUTCFullYear(), monthIndex: manila.getUTCMonth() };
+}
+
+// Works out which month/year sections /stats shows.
+//  - nothing given: the current month and the current year
+//  - month (with or without year): that month, plus that whole year
+//  - year only: just that year
+function resolveStatsPeriod({ year = null, monthIndex = null } = {}, now = new Date()) {
+  const current = getCurrentManilaMonth(now);
+  const onlyYear = year !== null && monthIndex === null;
+  const targetYear = year ?? current.year;
+  const targetMonth = onlyYear ? null : (monthIndex ?? current.monthIndex);
+
+  const yearRange = getYearRange(targetYear);
+  const monthRange = targetMonth === null ? null : getMonthRange(targetYear, targetMonth);
+  const isCurrentYear = targetYear === current.year;
+  const isCurrentMonth = isCurrentYear && targetMonth === current.monthIndex;
+  const notStarted = (monthRange || yearRange).start > now;
+
+  return { yearRange, monthRange, isCurrentYear, isCurrentMonth, notStarted };
+}
+
+async function buildStatsEmbed(guildId, period = {}) {
+  const { yearRange, monthRange, isCurrentYear, isCurrentMonth } = resolveStatsPeriod(period);
+  // The newest section decides which reviews are shown.
+  const reviewRange = monthRange || yearRange;
 
   const [month, year, reviews, trackingSince] = await Promise.all([
-    getPeriodStats(guildId, monthStart),
-    getPeriodStats(guildId, yearStart),
-    getRecentReviews(guildId),
+    monthRange ? getPeriodStats(guildId, monthRange.start, monthRange.end) : null,
+    getPeriodStats(guildId, yearRange.start, yearRange.end),
+    getRecentReviews(guildId, { since: reviewRange.start, until: reviewRange.end }),
     getTrackingSince(guildId),
   ]);
+
+  const fields = [];
+
+  if (month) {
+    fields.push({
+      name: isCurrentMonth ? `🗓️ This Month (${monthRange.label})` : `🗓️ ${monthRange.label}`,
+      value: formatPeriod(month),
+      inline: false,
+    });
+  }
+
+  fields.push(
+    {
+      name: isCurrentYear ? `📅 This Year (${yearRange.label})` : `📅 ${yearRange.label}`,
+      value: formatPeriod(year),
+      inline: false,
+    },
+    {
+      name: `📝 Recent Ratings & Reviews (${reviewRange.label})`,
+      value: formatReviews(reviews),
+      inline: false,
+    }
+  );
+
+  const description = isCurrentMonth || (!monthRange && isCurrentYear)
+    ? `Here’s how Café Cloud has been reading~ (as of <t:${Math.floor(Date.now() / 1000)}:F>)`
+    : `Here’s how Café Cloud read in **${reviewRange.label}**~ Use \`/reviews\` to see every review from a month.`;
 
   const trackedNote = trackingSince
     ? `Pages turned and reading-session time are tracked since ${trackingSince.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}.`
@@ -165,12 +240,8 @@ async function buildStatsEmbed(guildId) {
   return new EmbedBuilder()
     .setTitle('📊 Café Cloud Reading Stats')
     .setColor(0xA78B6D)
-    .setDescription(`Here’s how Café Cloud has been reading~ (as of <t:${Math.floor(Date.now() / 1000)}:F>)`)
-    .addFields(
-      { name: `🗓️ This Month (${monthLabel})`, value: formatPeriod(month), inline: false },
-      { name: `📅 This Year (${yearLabel})`, value: formatPeriod(year), inline: false },
-      { name: '📝 Recent Ratings & Reviews', value: formatReviews(reviews), inline: false }
-    )
+    .setDescription(description)
+    .addFields(fields)
     .setFooter({ text: `Private books count toward the totals but are never shown. ${trackedNote}` })
     .setTimestamp();
 }
@@ -178,6 +249,8 @@ async function buildStatsEmbed(guildId) {
 module.exports = {
   getPeriodStarts,
   getMonthRange,
+  getYearRange,
+  resolveStatsPeriod,
   getFinishedInMonth,
   getPeriodStats,
   getRecentReviews,

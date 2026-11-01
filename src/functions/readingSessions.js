@@ -234,9 +234,10 @@ async function startReadingSessionTracker(client) {
 }
 
 // Total "hours reading together" for sessions that started on/after `since`.
-async function getSessionTotals(guildId, since) {
+async function getSessionTotals(guildId, since, until = null) {
   const sessions = await getReadingSessionsCollection();
-  const found = await sessions.find({ guildId, startedAt: { $gte: since } }).toArray();
+  const startedAt = until ? { $gte: since, $lt: until } : { $gte: since };
+  const found = await sessions.find({ guildId, startedAt }).toArray();
   const now = Date.now();
 
   return {
